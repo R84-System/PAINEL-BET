@@ -1,10 +1,10 @@
 """
 Painel Inteligente de Futebol para Transmissões ao Vivo
-Estilo Profissional (Padrão Live TikTok) - Arquitetura Sênior
+Estilo Profissional (Padrão Live TikTok) - Lendo direto dos Secrets
 """
 
 import streamlit as st
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import requests
 
 # =====================================================================
@@ -36,7 +36,7 @@ UI_THEME = {
 }
 
 # =====================================================================
-# BLOCO 2: CLIENTE DE API (INTEGRAÇÃO COM A API-FOOTBALL)
+# BLOCO 2: CLIENTE DE API (INTEGRAÇÃO COM A API-SPORTS VIA SECRETS)
 # =====================================================================
 
 class FootballAPIClient:
@@ -44,21 +44,38 @@ class FootballAPIClient:
         self.api_key = st.secrets.get("API_FOOTBALL_KEY", "")
         self.base_url = "https://v3.football.api-sports.io"
         self.headers = {
-            "x-rapidapi-key": self.api_key,
-            "x-rapidapi-host": "v3.football.api-sports.io"
+            "x-apisports-key": self.api_key
         }
 
-    def get_fixtures_by_date(self, league_id: int, date_str: str) -> list:
+    def _get_active_season(self, league_id: int) -> int:
+        now = datetime.now()
+        year = now.year
+        if league_id in [71, 128, 253]:
+            return year
+        if now.month < 7:
+            return year - 1
+        return year
+
+    def get_fixtures_by_date(self, league_id: int, date_str: str) -> tuple:
         if not self.api_key:
-            return []
+            return [], "Chave 'API_FOOTBALL_KEY' não encontrada nos Secrets do Streamlit."
+        
+        season = self._get_active_season(league_id)
         try:
-            url = f"{self.base_url}/fixtures?league={league_id}&season=2026&date={date_str}"
+            url = f"{self.base_url}/fixtures?league={league_id}&season={season}&date={date_str}"
             response = requests.get(url, headers=self.headers, timeout=10)
+            
             if response.status_code == 200:
-                return response.json().get("response", [])
-            return []
-        except requests.exceptions.RequestException:
-            return []
+                data = response.json()
+                if "errors" in data and data["errors"]:
+                    return [], str(data["errors"])
+                return data.get("response", []), None
+            elif response.status_code == 403:
+                return [], "Erro 403: Chave de API inválida."
+            else:
+                return [], f"Erro HTTP {response.status_code}"
+        except requests.exceptions.RequestException as e:
+            return [], f"Erro de conexão: {str(e)}"
 
     def get_fixture_statistics(self, fixture_id: int) -> list:
         if not self.api_key:
@@ -124,7 +141,7 @@ class MatchAnalyticsEngine:
         """Retorna o cronômetro em formato HH:MM:SS e o horário local da partida."""
         try:
             match_time = datetime.fromisoformat(match_date_str.replace("Z", "+00:00"))
-            local_time_str = match_time.strftime("%H:%M")
+            local_time_str = match_time.astimezone().strftime("%H:%M")
             
             now = datetime.now(timezone.utc)
             diff = match_time - now
@@ -235,8 +252,19 @@ st.markdown("<h2 style='text-align: center; color: white; margin-bottom: 20px;'>
 def render_live_dashboard():
     league_id = st.session_state.selected_league
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    matches = api_client.get_fixtures_by_date(league_id, today_str)
+    matches, error_msg = api_client.get_fixtures_by_date(league_id, today_str)
     
+    if error_msg:
+        st.error(f"⚠️ Erro ao consultar API: {error_msg}")
+        return
+
+    if not matches:
+        yesterday_str = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+        tomorrow_str = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%d")
+        m_yes, _ = api_client.get_fixtures_by_date(league_id, yesterday_str)
+        m_tom, _ = api_client.get_fixtures_by_date(league_id, tomorrow_str)
+        matches = m_yes + m_tom
+
     if not matches:
         st.info("Nenhuma partida agendada para hoje nesta liga.")
         return
