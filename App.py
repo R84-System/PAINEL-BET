@@ -127,15 +127,6 @@ dashboard_html = """
             color: #94a3b8;
             margin-top: 4px;
         }
-        .goals-container {
-            text-align: center;
-            font-size: 11px;
-            color: #facc15;
-            margin-top: 8px;
-            background: rgba(250, 204, 21, 0.1);
-            padding: 6px;
-            border-radius: 6px;
-        }
         .yellow-card {
             background-color: #eab308;
             color: #000;
@@ -502,9 +493,9 @@ dashboard_html = """
 
                 let hYellowCount = 0, aYellowCount = 0;
                 let hRedCount = 0, aRedCount = 0;
-                let goalsHtmlList = [];
+                let hGoalsList = [];
+                let aGoalsList = [];
 
-                // Unificar fontes de detalhes (Scoreboard details + Summary scoringPlays / details)
                 let allDetails = [];
                 if (competition.details) allDetails = allDetails.concat(competition.details);
                 if (summary.details) allDetails = allDetails.concat(summary.details);
@@ -543,21 +534,16 @@ dashboard_html = """
                         let isOwn = text.includes("own goal") || text.includes("contra");
                         
                         let goalStr = `⚽ <b>${scorer}${isOwn ? ' (Contra)' : ''}</b> ${clockVal ? '(' + clockVal + "')" : ''}`;
-                        if (!goalsHtmlList.includes(goalStr)) {
-                            goalsHtmlList.push(goalStr);
+                        if (isHome) {
+                            if (!hGoalsList.includes(goalStr)) hGoalsList.push(goalStr);
+                        } else if (isAway) {
+                            if (!aGoalsList.includes(goalStr)) aGoalsList.push(goalStr);
                         }
                     }
                 }
 
-                let hBadges = `<div style="text-align:right; margin-bottom:4px; display:flex; justify-content:flex-end; gap:4px;">
-                    <span class="yellow-card">🟨 ${hYellowCount}</span>
-                    <span class="red-card">🟥 ${hRedCount}</span>
-                </div>`;
-
-                let aBadges = `<div style="text-align:left; margin-bottom:4px; display:flex; justify-content:flex-start; gap:4px;">
-                    <span class="yellow-card">🟨 ${aYellowCount}</span>
-                    <span class="red-card">🟥 ${aRedCount}</span>
-                </div>`;
+                let hGoalsHtml = hGoalsList.length > 0 ? `<div style="text-align:right; font-size:11px; color:#facc15; margin-bottom:4px;">${hGoalsList.join("<br>")}</div>` : '';
+                let aGoalsHtml = aGoalsList.length > 0 ? `<div style="text-align:left; font-size:11px; color:#facc15; margin-bottom:4px;">${aGoalsList.join("<br>")}</div>` : '';
 
                 let centerBadge = "";
                 let isHalftime = (statusName === 'STATUS_HALFTIME' || rawDetail.toLowerCase().includes('halftime') || rawDetail.toLowerCase().includes('intervalo'));
@@ -596,8 +582,6 @@ dashboard_html = """
                     `;
                 }
 
-                let goalsHtml = goalsHtmlList.length > 0 ? `<div class="goals-container"><b>Gols:</b> ${goalsHtmlList.join(" | ")}</div>` : '';
-
                 let isOpen = openStates[eventId] ? 'open' : '';
                 let possH = hStats.possessionPct || "0%"; if(!possH.includes("%") && possH !== "0") possH += "%";
                 let possA = aStats.possessionPct || "0%"; if(!possA.includes("%") && possA !== "0") possA += "%";
@@ -613,7 +597,7 @@ dashboard_html = """
                         <div class="header-league">🏆 Campeonato: ${lName}</div>
                         <div class="match-grid">
                             <div>
-                                ${hBadges}
+                                ${hGoalsHtml}
                                 <div class="team-home">${homeTeam}</div>
                                 <div style="text-align:right; margin-top:6px;">
                                     <span class="pressure-label" style="color: ${getBarColor(hPct)};">${getBarLabel(hPct)} (${hPct}%)</span>
@@ -622,10 +606,9 @@ dashboard_html = """
                             </div>
                             <div class="center-info">
                                 ${centerBadge}
-                                ${goalsHtml}
                             </div>
                             <div>
-                                ${aBadges}
+                                ${aGoalsHtml}
                                 <div class="team-away">${awayTeam}</div>
                                 <div style="text-align:left; margin-top:6px;">
                                     <span class="pressure-label" style="color: ${getBarColor(aPct)};">${getBarLabel(aPct)} (${aPct}%)</span>
