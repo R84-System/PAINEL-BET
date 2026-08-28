@@ -1,6 +1,6 @@
 """
 Painel Inteligente de Futebol para Transmissões ao Vivo
-Versão com Diagnóstico de API e Tratamento de Erros
+Versão Corrigida para Credenciais Diretas da API-Sports
 """
 
 import streamlit as st
@@ -36,16 +36,16 @@ UI_THEME = {
 }
 
 # =====================================================================
-# BLOCO 2: CLIENTE DE API COM DIAGNÓSTICO
+# BLOCO 2: CLIENTE DE API COM O CABEÇALHO CORRETO (API-SPORTS)
 # =====================================================================
 
 class FootballAPIClient:
     def __init__(self):
         self.api_key = st.secrets.get("API_FOOTBALL_KEY", "")
         self.base_url = "https://v3.football.api-sports.io"
+        # Cabeçalho ajustado para contas diretas da API-Sports (conforme sua documentação)
         self.headers = {
-            "x-rapidapi-key": self.api_key,
-            "x-rapidapi-host": "v3.football.api-sports.io"
+            "x-apisports-key": self.api_key
         }
 
     def _get_active_season(self, league_id: int) -> int:
@@ -68,12 +68,11 @@ class FootballAPIClient:
             
             if response.status_code == 200:
                 data = response.json()
-                # Verifica se houve erro retornado pela API (ex: limite excedido)
                 if "errors" in data and data["errors"]:
                     return [], str(data["errors"])
                 return data.get("response", []), None
             elif response.status_code == 403:
-                return [], "Erro 403: Chave de API inválida ou sem permissão."
+                return [], "Erro 403: Chave de API inválida."
             else:
                 return [], f"Erro HTTP {response.status_code}"
         except requests.exceptions.RequestException as e:
@@ -273,7 +272,7 @@ def render_live_dashboard():
         matches = m_yes + m_tom
 
     if not matches:
-        st.info("Nenhuma partida agendada para hoje nesta liga. Se houver jogos próximos, verifique se a chave de API está ativa.")
+        st.info("Nenhuma partida agendada para hoje nesta liga.")
         return
 
     for match in matches:
