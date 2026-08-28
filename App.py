@@ -100,6 +100,15 @@ dashboard_html = """
             border: 1px solid #334155;
             display: inline-block;
         }
+        .badge-halftime {
+            background-color: #eab308;
+            color: #000;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: bold;
+            display: inline-block;
+        }
         .badge-post {
             color: #94a3b8;
             font-weight: bold;
@@ -124,8 +133,8 @@ dashboard_html = """
             color: #facc15;
             margin-top: 8px;
             background: rgba(250, 204, 21, 0.1);
-            padding: 4px;
-            border-radius: 4px;
+            padding: 6px;
+            border-radius: 6px;
         }
         .yellow-card {
             background-color: #eab308;
@@ -188,7 +197,6 @@ dashboard_html = """
             flex-grow: 1;
         }
         
-        /* Ticker Animado Contínuo */
         .ticker-bar {
             background: #1e293b;
             padding: 8px 12px;
@@ -258,17 +266,11 @@ dashboard_html = """
                 <option value="conmebol.sudamericana">🌎 Copa Sudamericana (Sul-Americana)</option>
                 <option value="uefa.champions">🇪🇺 Champions League</option>
                 <option value="uefa.europa">🇪🇺 Europa League</option>
-                <option value="uefa.super_cup">🇪🇺 Super Cup (UEFA)</option>
                 <option value="eng.1">🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League</option>
-                <option value="eng.fa">🏴󠁧󠁢󠁥󠁮󠁧󠁿 FA Cup (Copa da Inglaterra)</option>
                 <option value="esp.1">🇪🇸 La Liga</option>
-                <option value="esp.copa_del_rey">🇪🇸 Copa del Rey</option>
                 <option value="ita.1">🇮🇹 Serie A (Itália)</option>
-                <option value="ita.coppa_italia">🇮🇹 Coppa Italia</option>
                 <option value="ger.1">🇩🇪 Bundesliga</option>
-                <option value="ger.dfb_pokal">🇩🇪 DFB Pokal</option>
                 <option value="fra.1">🇫🇷 Ligue 1</option>
-                <option value="fra.coupe_de_france">🇫🇷 Coupe de France</option>
                 <option value="por.1">🇵🇹 Primeira Liga</option>
                 <option value="ksa.1">🇸🇦 Saudi Pro League</option>
                 <option value="arg.1">🇦🇷 Liga Profesional (Argentina)</option>
@@ -278,9 +280,6 @@ dashboard_html = """
                 <option value="chi.1">🇨🇱 Liga Chilena</option>
                 <option value="ned.1">🇳🇱 Eredivisie</option>
                 <option value="usa.1">🇺🇸 MLS</option>
-                <option value="chn.1">🇨🇳 Liga Chinesa</option>
-                <option value="jpn.1">🇯🇵 Liga Japonesa (J1)</option>
-                <option value="kor.1">🇰🇷 Liga Coreana (K League)</option>
                 <option value="fifa.friendly">🌍 Jogos Internacionais / Seleções (FIFA)</option>
             </select>
         </div>
@@ -303,17 +302,17 @@ dashboard_html = """
         const LEAGUES = {
             "bra.1": "Brasileirão Série A", "bra.2": "Brasileirão Série B", "bra.copa_brasil": "Copa do Brasil",
             "conmebol.libertadores": "Copa Libertadores", "conmebol.sudamericana": "Copa Sudamericana",
-            "uefa.champions": "Champions League", "uefa.europa": "Europa League", "uefa.super_cup": "Super Cup (UEFA)",
-            "eng.1": "Premier League", "eng.fa": "FA Cup", "esp.1": "La Liga", "esp.copa_del_rey": "Copa del Rey",
-            "ita.1": "Serie A (Itália)", "ita.coppa_italia": "Coppa Italia", "ger.1": "Bundesliga", "ger.dfb_pokal": "DFB Pokal",
-            "fra.1": "Ligue 1", "fra.coupe_de_france": "Coupe de France", "por.1": "Primeira Liga", "ksa.1": "Saudi Pro League",
-            "arg.1": "Liga Profesional", "mex.1": "Liga MX", "col.1": "Campeonato Colombiano", "ecu.1": "Campeonato do Equador",
-            "chi.1": "Liga Chilena", "ned.1": "Eredivisie", "usa.1": "MLS", "chn.1": "Liga Chinesa",
-            "jpn.1": "Liga Japonesa", "kor.1": "K League", "fifa.friendly": "Jogos Internacionais"
+            "uefa.champions": "Champions League", "uefa.europa": "Europa League",
+            "eng.1": "Premier League", "esp.1": "La Liga", "ita.1": "Serie A (Itália)", "ger.1": "Bundesliga",
+            "fra.1": "Ligue 1", "por.1": "Primeira Liga", "ksa.1": "Saudi Pro League",
+            "arg.1": "Liga Profesional", "mex.1": "Liga MX", "col.1": "Campeonato Colombiano",
+            "ecu.1": "Campeonato do Equador", "chi.1": "Liga Chilena", "ned.1": "Eredivisie",
+            "usa.1": "MLS", "fifa.friendly": "Jogos Internacionais"
         };
 
         let previousScores = {};
         let summariesCache = {};
+        let openStates = {}; // Mantém o estado aberto das estatísticas entre os ciclos de atualização
 
         function formatDateBrasilia(dateStr) {
             if (!dateStr) return "Em breve";
@@ -338,13 +337,6 @@ dashboard_html = """
         }
 
         async function fetchAllData() {
-            // Salva quais accordions de estatísticas estão abertos atualmente antes de atualizar
-            let openDetails = new Set();
-            document.querySelectorAll('details[open]').forEach(el => {
-                let id = el.getAttribute('data-event-id');
-                if (id) openDetails.add(id);
-            });
-
             let selectedLeague = document.getElementById('leagueSelect').value;
             let searchQuery = document.getElementById('searchInput').value.toLowerCase().trim();
             
@@ -363,7 +355,7 @@ dashboard_html = """
                         let comp = ev.competitions[0];
                         let state = comp.status.type.state;
                         
-                        if (state === 'in') {
+                        if (state === 'in' || comp.status.type.name === 'STATUS_HALFTIME') {
                             let hTeam = "Casa", aTeam = "Fora", hScore = "0", aScore = "0";
                             for (let c of comp.competitors) {
                                 if (c.homeAway === 'home') {
@@ -384,12 +376,17 @@ dashboard_html = """
                                 matchesToDisplay.push({ leagueName, lSlug, event: ev });
                             }
                         } else if (selectedLeague === 'all_live') {
-                            if (state === 'in') matchesToDisplay.push({ leagueName, lSlug, event: ev });
+                            if (state === 'in' || comp.status.type.name === 'STATUS_HALFTIME') matchesToDisplay.push({ leagueName, lSlug, event: ev });
                         } else {
                             matchesToDisplay.push({ leagueName, lSlug, event: ev });
                         }
                     }
                 } catch(e) {}
+            }
+
+            // Pré-carrega sumários para todas as partidas exibidas (para garantir gols e cartões imediatos)
+            for (let item of matchesToDisplay) {
+                await asyncizedFetchSummary(item.lSlug, item.event.id);
             }
 
             // Atualiza Ticker contínuo
@@ -443,6 +440,7 @@ dashboard_html = """
                 previousScores[matchKey] = scoreKey;
 
                 let state = competition.status.type.state;
+                let statusName = competition.status.type.name || "";
                 let rawDetail = competition.status.type.detail || "";
                 let displayClock = competition.status.displayClock || "";
                 let period = competition.status.period || 1;
@@ -483,7 +481,7 @@ dashboard_html = """
                 let getBarColor = (pct) => pct >= 65 ? "#22c55e" : (pct >= 35 ? "#ffffff" : "#ef4444");
                 let getBarLabel = (pct) => pct >= 65 ? "🔥 Pressão Alta" : (pct >= 35 ? "⚖️ Neutro" : "🛡️ Defensiva / Baixa");
 
-                // Extração de Cartões e Gols do summary.details
+                // Extração de Cartões e Gols
                 let hYellowCount = 0, aYellowCount = 0;
                 let hRedCount = 0, aRedCount = 0;
                 let goalsHtmlList = [];
@@ -529,9 +527,18 @@ dashboard_html = """
                 }
 
                 let centerBadge = "";
-                if (state === 'in') {
+                let isHalftime = (statusName === 'STATUS_HALFTIME' || rawDetail.toLowerCase().includes('halftime') || rawDetail.toLowerCase().includes('intervalo'));
+
+                if (isHalftime) {
+                    centerBadge = `
+                        <div>
+                            <span class="badge-halftime">⏸️ INTERVALO</span>
+                            <div style="margin:6px 0;"><h2 class="score-box" style="margin:0;">${homeScore} x ${awayScore}</h2></div>
+                        </div>
+                    `;
+                } else if (state === 'in') {
                     let pName = period === 1 ? "1º Tempo" : (period === 2 ? "2º Tempo" : (period >= 3 ? "Prorrogação/Pênaltis" : `Tempo ${period}`));
-                    let clockDisp = displayClock ? ` (${displayClock})` : ` (${rawDetail})`;
+                    let clockDisp = displayClock ? ` (${displayClock}')` : ` (${rawDetail})`;
                     let scClass = isGoalAlert ? "goal-alert" : "";
                     centerBadge = `
                         <div>
@@ -558,19 +565,16 @@ dashboard_html = """
 
                 let goalsHtml = goalsHtmlList.length > 0 ? `<div class="goals-container"><b>Gols:</b> ${goalsHtmlList.join(" | ")}</div>` : '';
 
-                // Verifica se este card estava com as estatísticas abertas
-                let isOpen = openDetails.has(eventId) ? 'open' : '';
-                let statsInnerHtml = '<p style="text-align:right;">Carregando...</p><p style="text-align:center; color:#94a3b8;">Posse de Bola<br>Chutes no Gol<br>Chutes Totais<br>Escanteios<br>Faltas</p><p style="text-align:left;">...</p>';
-                
-                if (isOpen && summary.boxscore) {
-                    let possH = hStats.possessionPct || "0%"; if(!possH.includes("%") && possH !== "0") possH += "%";
-                    let possA = aStats.possessionPct || "0%"; if(!possA.includes("%") && possA !== "0") possA += "%";
-                    statsInnerHtml = `
-                        <p style='text-align: right;'><b>${possH}</b><br>${hStats.shotsOnTarget || '0'}<br>${hStats.totalShots || '0'}<br>${hStats.wonCorners || '0'}<br>${hStats.foulsCommitted || hStats.fouls || '0'}</p>
-                        <p style='text-align: center; color: #94a3b8;'>Posse de Bola<br>Chutes no Gol<br>Chutes Totais<br>Escanteios<br>Faltas Cometidas</p>
-                        <p style='text-align: left;'><b>${possA}</b><br>${aStats.shotsOnTarget || '0'}<br>${aStats.totalShots || '0'}<br>${aStats.wonCorners || '0'}<br>${aStats.foulsCommitted || aStats.fouls || '0'}</p>
-                    `;
-                }
+                // Verifica se este card estava aberto com base no cache persistente
+                let isOpen = openStates[eventId] ? 'open' : '';
+                let possH = hStats.possessionPct || "0%"; if(!possH.includes("%") && possH !== "0") possH += "%";
+                let possA = aStats.possessionPct || "0%"; if(!possA.includes("%") && possA !== "0") possA += "%";
+
+                let statsInnerHtml = `
+                    <p style='text-align: right;'><b>${possH}</b><br>${hStats.shotsOnTarget || '0'}<br>${hStats.totalShots || '0'}<br>${hStats.wonCorners || '0'}<br>${hStats.foulsCommitted || hStats.fouls || '0'}</p>
+                    <p style='text-align: center; color: #94a3b8;'>Posse de Bola<br>Chutes no Gol<br>Chutes Totais<br>Escanteios<br>Faltas Cometidas</p>
+                    <p style='text-align: left;'><b>${possA}</b><br>${aStats.shotsOnTarget || '0'}<br>${aStats.totalShots || '0'}<br>${aStats.wonCorners || '0'}<br>${aStats.foulsCommitted || aStats.fouls || '0'}</p>
+                `;
 
                 html += `
                     <div class="card">
@@ -598,7 +602,7 @@ dashboard_html = """
                             </div>
                         </div>
 
-                        <details data-event-id="${eventId}" ${isOpen} ontoggle="if(this.open) loadSummaryData('${lSlug}', '${eventId}', this)">
+                        <details data-event-id="${eventId}" ${isOpen} ontoggle="openStates['${eventId}'] = this.open;">
                             <summary>📊 Ver Estatísticas Detalhadas (${homeTeam} vs ${awayTeam})</summary>
                             <div id="stats_${eventId}" class="stats-grid">
                                 ${statsInnerHtml}
@@ -609,32 +613,6 @@ dashboard_html = """
             }
 
             mainContainer.innerHTML = html;
-        }
-
-        async function loadSummaryData(slug, eventId, detailsEl) {
-            let data = await asyncizedFetchSummary(slug, eventId);
-            let target = document.getElementById(`stats_${eventId}`);
-            if (!target) return;
-
-            let hStats = {}, aStats = {};
-            if (data.boxscore && data.boxscore.teams) {
-                for (let t of data.boxscore.teams) {
-                    let side = t.homeAway === 'home' ? 'home' : 'away';
-                    for (let s of (t.statistics || [])) {
-                        if (side === 'home') hStats[s.name] = s.displayValue;
-                        else aStats[s.name] = s.displayValue;
-                    }
-                }
-            }
-
-            let possH = hStats.possessionPct || "0%"; if(!possH.includes("%") && possH !== "0") possH += "%";
-            let possA = aStats.possessionPct || "0%"; if(!possA.includes("%") && possA !== "0") possA += "%";
-
-            target.innerHTML = `
-                <p style='text-align: right;'><b>${possH}</b><br>${hStats.shotsOnTarget || '0'}<br>${hStats.totalShots || '0'}<br>${hStats.wonCorners || '0'}<br>${hStats.foulsCommitted || hStats.fouls || '0'}</p>
-                <p style='text-align: center; color: #94a3b8;'>Posse de Bola<br>Chutes no Gol<br>Chutes Totais<br>Escanteios<br>Faltas Cometidas</p>
-                <p style='text-align: left;'><b>${possA}</b><br>${aStats.shotsOnTarget || '0'}<br>${aStats.totalShots || '0'}<br>${aStats.wonCorners || '0'}<br>${aStats.foulsCommitted || aStats.fouls || '0'}</p>
-            `;
         }
 
         document.getElementById('leagueSelect').addEventListener('change', fetchAllData);
