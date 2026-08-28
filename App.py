@@ -1,6 +1,6 @@
 """
 Painel Inteligente de Futebol para Transmissões ao Vivo
-Versão Corrigida para Credenciais Diretas da API-Sports
+Versão com Inserção de Chave via Painel Lateral
 """
 
 import streamlit as st
@@ -36,14 +36,13 @@ UI_THEME = {
 }
 
 # =====================================================================
-# BLOCO 2: CLIENTE DE API COM O CABEÇALHO CORRETO (API-SPORTS)
+# BLOCO 2: CLIENTE DE API COM SUPORTE A CHAVE DINÂMICA
 # =====================================================================
 
 class FootballAPIClient:
-    def __init__(self):
-        self.api_key = st.secrets.get("API_FOOTBALL_KEY", "")
+    def __init__(self, api_key: str):
+        self.api_key = api_key
         self.base_url = "https://v3.football.api-sports.io"
-        # Cabeçalho ajustado para contas diretas da API-Sports (conforme sua documentação)
         self.headers = {
             "x-apisports-key": self.api_key
         }
@@ -59,7 +58,7 @@ class FootballAPIClient:
 
     def get_fixtures_by_date(self, league_id: int, date_str: str) -> tuple:
         if not self.api_key:
-            return [], "Chave API não configurada nos Secrets."
+            return [], "Chave da API não informada."
         
         season = self._get_active_season(league_id)
         try:
@@ -168,7 +167,7 @@ def configure_page_styles():
         page_title="Painel de Partidas - Live",
         page_icon="⚽",
         layout="centered",
-        initial_sidebar_state="collapsed"
+        initial_sidebar_state="expanded"
     )
     st.markdown(
         f"""
@@ -216,24 +215,27 @@ def configure_page_styles():
 
 def render_sidebar_admin():
     with st.sidebar:
-        st.markdown("### ⚙️ Painel ADM (Controle)")
+        st.markdown("### ⚙️ Painel ADM & Configuração")
         st.divider()
         
-        password = st.text_input("Senha de Acesso", type="password")
-        if password == "admin123":
-            st.session_state.admin_mode = True
-            st.success("Acesso Autorizado")
+        # Tenta pegar dos secrets do Streamlit, senão permite digitar aqui
+        default_key = ""
+        try:
+            default_key = st.secrets.get("API_FOOTBALL_KEY", "")
+        except Exception:
+            pass
+
+        api_key_input = st.text_input("Chave da API-Football", value=default_key, type="password")
+        st.session_state.api_key = api_key_input
+
+        st.divider()
+        selected_name = st.selectbox("Campeonato Mundial", options=list(LEAGUES.keys()))
+        st.session_state.selected_league = LEAGUES[selected_name]
         
-        if st.session_state.get("admin_mode", False):
-            selected_name = st.selectbox("Campeonato Mundial", options=list(LEAGUES.keys()))
-            st.session_state.selected_league = LEAGUES[selected_name]
-            
-            st.divider()
-            if st.button("🔄 Limpar Cache / Recarregar"):
-                st.cache_data.clear()
-                st.rerun()
-        else:
-            st.info("Insira a senha 'admin123' para alternar as ligas.")
+        st.divider()
+        if st.button("🔄 Limpar Cache / Recarregar"):
+            st.cache_data.clear()
+            st.rerun()
 
 # =====================================================================
 # BLOCO 5: CONTROLADOR PRINCIPAL DA APLICAÇÃO
@@ -241,17 +243,20 @@ def render_sidebar_admin():
 
 configure_page_styles()
 
-if "admin_mode" not in st.session_state:
-    st.session_state.admin_mode = False
 if "selected_league" not in st.session_state:
     st.session_state.selected_league = list(LEAGUES.values())[0]
 
-api_client = FootballAPIClient()
-analytics = MatchAnalyticsEngine()
-
 render_sidebar_admin()
 
+api_key = st.session_state.get("api_key", "")
+api_client = FootballAPIClient(api_key)
+analytics = MatchAnalyticsEngine()
+
 st.markdown("<h2 style='text-align: center; color: white; margin-bottom: 20px;'>⚽ Painel de Transmissão</h2>", unsafe_allow_html=True)
+
+if not api_key:
+    st.warning("⚠️ Insira a sua chave da API-Football no painel lateral à esquerda para carregar os jogos.")
+    st.stop()
 
 @st.fragment(run_every="1s")
 def render_live_dashboard():
@@ -291,7 +296,7 @@ def render_live_dashboard():
         home_logo = teams.get("home", {}).get("logo", "")
         away_logo = teams.get("away", {}).get("logo", "")
         
-        home_goals = goals.get("home") if goals.get("home") is not None else 0
+        home_goals = goals.get("home") if goals.get("home"] is not None else 0
         away_goals = goals.get("away") if goals.get("away") is not None else 0
         
         with st.container():
