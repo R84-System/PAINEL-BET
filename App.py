@@ -7,6 +7,27 @@ st.set_page_config(
     layout="wide"
 )
 
+# Inserção de CSS para a bolinha verde piscando
+st.markdown("""
+<style>
+@keyframes blink {
+    0% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.3; transform: scale(0.95); }
+    100% { opacity: 1; transform: scale(1); }
+}
+.blinking-dot {
+    height: 10px;
+    width: 10px;
+    background-color: #22c55e;
+    border-radius: 50%;
+    display: inline-block;
+    animation: blink 1s infinite ease-in-out;
+    margin-right: 6px;
+    box-shadow: 0 0 8px #22c55e;
+}
+</style>
+""", unsafe_allow_html=True)
+
 LEAGUES = {
     "🔴 Todos os Jogos ao Vivo (Global)": "all_live",
     "🇧🇷 Brasileirão Série A": "bra.1",
@@ -55,6 +76,24 @@ def extract_stats(summary_data):
         for stat in team_data.get("statistics", []):
             stats_dict[side][stat.get("name", "")] = stat.get("displayValue", "0")
     return stats_dict
+
+def extract_red_cards(summary_data, home_team_id, away_team_id):
+    home_players = []
+    away_players = []
+    details = summary_data.get("details", [])
+    for item in details:
+        text = str(item.get("type", {}).get("text", "")).lower()
+        if "red card" in text or "cartão vermelho" in text:
+            athlete = item.get("athlete", {})
+            p_name = athlete.get("displayName", "Jogador")
+            t_id = item.get("team", {}).get("id")
+            if t_id == home_team_id:
+                if p_name not in home_players:
+                    home_players.append(p_name)
+            else:
+                if p_name not in away_players:
+                    away_players.append(p_name)
+    return home_players, away_players
 
 def calculate_pressure(home_stats, away_stats):
     def parse_num(val):
@@ -109,7 +148,6 @@ league_slug = LEAGUES[selected_league_name]
 
 search_query = st.text_input("🔍 Buscar time (ex: Al Nassr, Real Madrid, Flamengo...)", "").strip().lower()
 
-# Fragmento com atualização automática a cada 10 segundos SEM piscar a tela inteira
 @st.fragment(run_every=10)
 def render_live_panel(slug, league_name, query):
     matches_to_display = []
@@ -147,13 +185,16 @@ def render_live_panel(slug, league_name, query):
         
         home_team, away_team = "Casa", "Fora"
         home_score, away_score = "0", "0"
+        home_team_id, away_team_id = "", ""
         
         for comp in competitors:
             if comp.get("homeAway") == "home":
                 home_team = comp.get("team", {}).get("displayName", "Casa")
+                home_team_id = comp.get("team", {}).get("id", "")
                 home_score = comp.get("score", "0")
             else:
                 away_team = comp.get("team", {}).get("displayName", "Fora")
+                away_team_id = comp.get("team", {}).get("id", "")
                 away_score = comp.get("score", "0")
         
         status_type = competition.get("status", {}).get("type", {})
@@ -165,14 +206,21 @@ def render_live_panel(slug, league_name, query):
         
         summary = fetch_match_summary(l_slug, event_id)
         stats = extract_stats(summary)
+        h_red_players, a_red_players = extract_red_cards(summary, home_team_id, away_team_id)
+        
         h_press, a_press = calculate_pressure(stats["home"], stats["away"])
 
         if query or slug == "all_live":
             st.caption(f"🏆 Campeonato: **{l_name}**")
 
+        # Indicadores de Cartão Vermelho acima dos nomes dos times
+        h_red_badge = f"<div style='text-align: right; margin-bottom: 2px;'><span style='background-color: #ef4444; color: white; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: bold;'>🟥 EXPULSO ({len(h_red_players)})</span></div>" if h_red_players else ""
+        a_red_badge = f"<div style='text-align: left; margin-bottom: 2px;'><span style='background-color: #ef4444; color: white; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: bold;'>🟥 EXPULSO ({len(a_red_players)})</span></div>" if a_red_players else ""
+
         col1, col2, col3 = st.columns([3, 2, 3])
         with col1:
-            st.markdown(f"<h3 style='text-align: right; color: #fff; margin-bottom: 0;'>{home_team}</h3>", unsafe_allow_html=True)
+            st.markdown(h_red_badge, unsafe_allow_html=True)
+            st.markdown(f"<h3 style='text-align: right; color: #fff; margin-top: 0; margin-bottom: 0;'>{home_team}</h3>", unsafe_allow_html=True)
             st.markdown(get_custom_bar(h_press, "home"), unsafe_allow_html=True)
         
         with col2:
@@ -191,29 +239,30 @@ def render_live_panel(slug, league_name, query):
                 clock_display = f" ({display_clock})" if display_clock else f" ({detail})"
                 st.markdown(f"""
                 <div style='text-align: center;'>
-                    <span style='background-color:#ff4b4b; color:white; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:bold;'>
-                        🔴 AO VIVO • {period_name}{clock_display}
+                    <span style='background-color:#1e293b; color:white; padding:4px 10px; border-radius:6px; font-size:11px; font-weight:bold; border: 1px solid #334155;'>
+                        <span class="blinking-dot"></span>AO VIVO • {period_name}{clock_display}
                     </span>
-                    <h2 style='color:#fff; margin:4px 0;'>{home_score} x {away_score}</h2>
+                    <h2 style='color:#fff; margin:6px 0;'>{home_score} x {away_score}</h2>
                 </div>
                 """, unsafe_allow_html=True)
             elif state == "post":
                 st.markdown(f"""
                 <div style='text-align: center;'>
                     <span style='color:#94a3b8; font-weight:bold;'>ENCERRADO</span>
-                    <h2 style='color:#fff; margin:4px 0;'>{home_score} x {away_score}</h2>
+                    <h2 style='color:#fff; margin:6px 0;'>{home_score} x {away_score}</h2>
                 </div>
                 """, unsafe_allow_html=True)
             else:
                 st.markdown(f"""
                 <div style='text-align: center;'>
-                    <span style='background-color:#3b82f6; color:white; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:bold;'>🕒 {detail}</span>
-                    <h3 style='color:#94a3b8; margin:4px 0;'>vs</h3>
+                    <span style='background-color:#3b82f6; color:white; padding:4px 10px; border-radius:6px; font-size:11px; font-weight:bold;'>🕒 {detail}</span>
+                    <h3 style='color:#94a3b8; margin:6px 0;'>vs</h3>
                 </div>
                 """, unsafe_allow_html=True)
                 
         with col3:
-            st.markdown(f"<h3 style='text-align: left; color: #fff; margin-bottom: 0;'>{away_team}</h3>", unsafe_allow_html=True)
+            st.markdown(a_red_badge, unsafe_allow_html=True)
+            st.markdown(f"<h3 style='text-align: left; color: #fff; margin-top: 0; margin-bottom: 0;'>{away_team}</h3>", unsafe_allow_html=True)
             st.markdown(get_custom_bar(a_press, "away"), unsafe_allow_html=True)
 
         with st.expander(f"📊 Ver Estatísticas Detalhadas ({home_team} vs {away_team})"):
@@ -231,8 +280,18 @@ def render_live_panel(slug, league_name, query):
             fouls_h = h_stats.get("foulsCommitted", h_stats.get("fouls", "0"))
             fouls_a = a_stats.get("foulsCommitted", a_stats.get("fouls", "0"))
             
-            cards_h = f"🟨 {h_stats.get('yellowCards', '0')} | 🟥 {h_stats.get('redCards', '0')}"
-            cards_a = f"🟨 {a_stats.get('yellowCards', '0')} | 🟥 {a_stats.get('redCards', '0')}"
+            yellow_h = h_stats.get("yellowCards", "0")
+            yellow_a = a_stats.get("yellowCards", "0")
+            red_h_count = h_stats.get("redCards", str(len(h_red_players)))
+            red_a_count = a_stats.get("redCards", str(len(a_red_players)))
+
+            cards_h_str = f"🟨 {yellow_h} | 🟥 {red_h_count}"
+            cards_a_str = f"🟨 {yellow_a} | 🟥 {red_a_count}"
+
+            if h_red_players:
+                cards_h_str += f"<br><span style='font-size:10px; color:#ef4444;'>Expulso(s): {', '.join(h_red_players)}</span>"
+            if a_red_players:
+                cards_a_str += f"<br><span style='font-size:10px; color:#ef4444;'>Expulso(s): {', '.join(a_red_players)}</span>"
 
             m_col1, m_col2, m_col3 = st.columns([2, 3, 2])
             with m_col1:
@@ -243,7 +302,7 @@ def render_live_panel(slug, league_name, query):
                     {h_stats.get('totalShots', '0')}<br>
                     {h_stats.get('wonCorners', '0')}<br>
                     {fouls_h}<br>
-                    {cards_h}
+                    {cards_h_str}
                 </p>
                 """, unsafe_allow_html=True)
             with m_col2:
@@ -265,7 +324,7 @@ def render_live_panel(slug, league_name, query):
                     {a_stats.get('totalShots', '0')}<br>
                     {a_stats.get('wonCorners', '0')}<br>
                     {fouls_a}<br>
-                    {cards_a}
+                    {cards_a_str}
                 </p>
                 """, unsafe_allow_html=True)
 
