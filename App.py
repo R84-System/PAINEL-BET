@@ -7,7 +7,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# CSS com a bolinha verde piscando devagar e efeito de LED passando no topo
+# CSS com a bolinha verde piscando devagar
 st.markdown("""
 <style>
 @keyframes blink {
@@ -24,28 +24,6 @@ st.markdown("""
     animation: blink 2s infinite ease-in-out;
     margin-right: 6px;
     box-shadow: 0 0 8px #22c55e;
-}
-@keyframes ledScan {
-    0% { left: -50%; }
-    50% { left: 100%; }
-    100% { left: -50%; }
-}
-.led-bar-container {
-    width: 100%;
-    height: 4px;
-    background-color: #334155;
-    position: relative;
-    overflow: hidden;
-    border-radius: 2px;
-    margin: 10px 0 20px 0;
-}
-.led-bar {
-    position: absolute;
-    width: 30%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, #22c55e, transparent);
-    animation: ledScan 2s infinite linear;
-    box-shadow: 0 0 10px #22c55e;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -161,6 +139,39 @@ def get_custom_bar(percentage, side):
     </div>
     """
 
+def render_live_ticker():
+    ticker_matches = []
+    for l_name, l_slug in LEAGUES.items():
+        if l_slug == "all_live":
+            continue
+        events = fetch_espn_matches(l_slug)
+        for ev in events:
+            comp = ev.get("competitions", [{}])[0]
+            state = comp.get("status", {}).get("type", {}).get("state")
+            if state == "in":
+                competitors = comp.get("competitors", [])
+                h_team, a_team, h_score, a_score = "Casa", "Fora", "0", "0"
+                for c in competitors:
+                    if c.get("homeAway") == "home":
+                        h_team = c.get("team", {}).get("shortDisplayName", c.get("team", {}).get("displayName", "Casa"))
+                        h_score = c.get("score", "0")
+                    else:
+                        a_team = c.get("team", {}).get("shortDisplayName", c.get("team", {}).get("displayName", "Fora"))
+                        a_score = c.get("score", "0")
+                clock = comp.get("status", {}).get("displayClock", "")
+                ticker_matches.append(f"⚽ {h_team} &nbsp;<b>{h_score} x {a_score}</b>&nbsp; {a_team} &nbsp;({clock})")
+    
+    if ticker_matches:
+        content = " &nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp; ".join(ticker_matches)
+        st.markdown(f"""
+        <div style="background-color: #1e293b; padding: 10px; border-radius: 8px; border: 1px solid #334155; margin-bottom: 20px;">
+            <div style="font-size: 11px; color: #22c55e; font-weight: bold; margin-bottom: 4px;">🟢 TICKER AO VIVO (PLACAR EM TEMPO REAL)</div>
+            <marquee behavior="scroll" direction="left" scrollamount="4" style="color: white; font-weight: bold; font-size: 14px;">
+                {content}
+            </marquee>
+        </div>
+        """, unsafe_allow_html=True)
+
 st.title("⚽ Painel Pro de Futebol ao Vivo")
 
 st.sidebar.title("⚙️ Configurações")
@@ -168,6 +179,10 @@ selected_league_name = st.sidebar.selectbox("Campeonato", list(LEAGUES.keys()))
 league_slug = LEAGUES[selected_league_name]
 
 search_query = st.text_input("🔍 Buscar time (ex: Al Nassr, Real Madrid, Flamengo...)", "").strip().lower()
+
+# Exibe o ticker contínuo no topo quando estiver em Todos os Jogos
+if league_slug == "all_live" and not search_query:
+    render_live_ticker()
 
 @st.fragment(run_every=10)
 def render_live_panel(slug, league_name, query):
@@ -183,7 +198,6 @@ def render_live_panel(slug, league_name, query):
                     matches_to_display.append((l_name, l_slug, ev))
     elif slug == "all_live":
         st.markdown("### 🟢 Todos os Jogos Ao Vivo no Mundo")
-        st.markdown('<div class="led-bar-container"><div class="led-bar"></div></div>', unsafe_allow_html=True)
         for l_name, l_slug in LEAGUES.items():
             if l_slug == "all_live":
                 continue
