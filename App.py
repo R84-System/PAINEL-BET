@@ -1,5 +1,5 @@
 # app.py
-# Painel Inteligente de Futebol para Transmissões ao Vivo (Com Termômetro em Barra e Estatísticas Expandidas)
+# Painel Inteligente de Futebol para Transmissões ao Vivo
 
 import streamlit as st
 from datetime import datetime, timezone
@@ -17,8 +17,6 @@ LEAGUES = {
     "Libertadores": 13,
 }
 
-REFRESH_RATE_SECONDS = 30
-
 UI_THEME = {
     "bg_color": "#0e1117",
     "card_bg": "#16192b",
@@ -34,7 +32,6 @@ UI_THEME = {
 
 class FootballAPI:
     def __init__(self):
-        # Resgata a chave configurada nos Secrets do Streamlit Cloud
         self.api_key = st.secrets.get("API_FOOTBALL_KEY", "")
         self.base_url = "https://v3.football.api-sports.io"
         self.headers = {
@@ -42,14 +39,16 @@ class FootballAPI:
             "x-rapidapi-host": "v3.football.api-sports.io"
         }
 
-    def fetch_live_matches(self, league_id: int):
-        """Busca partidas ao vivo em tempo real para a liga selecionada."""
+    def fetch_fixtures_today(self, league_id: int):
+        """Busca todas as partidas do dia para a liga, permitindo visualizar pré-jogos e encerrados."""
         if not self.api_key:
             st.warning("⚠️ Chave da API (API_FOOTBALL_KEY) não configurada nos Secrets do Streamlit.")
             return []
         
+        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        
         try:
-            url = f"{self.base_url}/fixtures?league={league_id}&season=2026&live=all"
+            url = f"{self.base_url}/fixtures?league={league_id}&season=2026&date={today_str}"
             response = requests.get(url, headers=self.headers, timeout=10)
             if response.status_code == 200:
                 return response.json().get("response", [])
@@ -59,7 +58,7 @@ class FootballAPI:
             return []
 
     def fetch_match_statistics(self, fixture_id: int):
-        """Busca estatísticas detalhadas de uma partida específica ao clicar nela."""
+        """Busca estatísticas detalhadas de uma partida específica."""
         if not self.api_key:
             return []
         
@@ -73,14 +72,11 @@ class FootballAPI:
             return []
 
 # =====================================================================
-# 3. MOTOR ANALÍTICO (CÁLCULO DA BARRA DE PRESSÃO E TERMÔMETRO)
+# 3. MOTOR ANALÍTICO (CÁLCULO DA BARRA DE PRESSÃO E CONTAGEM)
 # =====================================================================
 
 def calculate_thermometer(stats_data):
-    """
-    Processa as estatísticas reais (finalizações e posse) para gerar 
-    as porcentagens da barra de progresso do termômetro.
-    """
+    """Processa estatísticas reais para gerar a barra de progresso do termômetro."""
     if not stats_data or len(stats_data) < 2:
         return {"home_pct": 50, "away_pct": 50, "status": "Jogo Neutro ⚖️", "trend": "Equilibrado"}
     
@@ -97,7 +93,6 @@ def calculate_thermometer(stats_data):
             except:
                 return 0
 
-        # Peso maior para finalizações no alvo e total de finalizações
         home_shots = parse_val(home_stats.get("Shots on Goal", 0)) * 3 + parse_val(home_stats.get("Total Shots", 0))
         away_shots = parse_val(away_stats.get("Shots on Goal", 0)) * 3 + parse_val(away_stats.get("Total Shots", 0))
         
@@ -121,6 +116,27 @@ def calculate_thermometer(stats_data):
         return {"home_pct": home_pct, "away_pct": away_pct, "status": status, "trend": trend}
     except:
         return {"home_pct": 50, "away_pct": 50, "status": "Jogo Neutro ⚖️", "trend": "Equilibrado"}
+
+def format_countdown(match_date_str):
+    """Calcula a contagem regressiva para jogos que vão iniciar."""
+    try:
+        match_time = datetime.fromisoformat(match_date_str.replace("Z", "+00:00"))
+        now = datetime.now(timezone.utc)
+        diff = match_time - now
+        total_seconds = int(diff.total_seconds())
+        
+        if total_seconds <= 0:
+            return "Iniciando..."
+        
+        minutes = total_seconds // 60
+        if minutes < 60:
+            return f"Inicia em {minutes} min"
+        
+        hours = minutes // 60
+        rem_mins = minutes % 60
+        return f"Inicia em {hours}h {rem_mins}m"
+    except:
+        return "Pré-jogo"
 
 # =====================================================================
 # 4. CONFIGURAÇÃO DA INTERFACE E ESTILOS (STREAMLIT)
@@ -156,6 +172,14 @@ st.markdown(
     }}
     .live-badge {{
         background-color: {UI_THEME['accent_live']};
+        color: white;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 700;
+    }}
+    .pre-badge {{
+        background-color: #3b82f6;
         color: white;
         padding: 4px 10px;
         border-radius: 4px;
@@ -217,10 +241,10 @@ st.title("⚽ Painel Inteligente de Partidas")
 @st.fragment(run_every="30s")
 def render_broadcast_dashboard():
     league_id = st.session_state.selected_league
-    matches = api.fetch_live_matches(league_id)
+    matches = api.fetch_fixtures_today(league_id)
     
     if not matches:
-        st.info("Nenhuma partida ao vivo no momento para esta liga. Verifique se a chave da API está ativa nos Secrets.")
+        st.info("Nenhuma partida agendada para hoje nesta liga. Tente alternar o campeonato no painel ADM ou aguarde novas rodadas.")
         return
 
     for match in matches:
@@ -232,17 +256,13 @@ def render_broadcast_dashboard():
         status_short = fixture.get("status", {}).get("short", "NS")
         elapsed = fixture.get("status", {}).get("elapsed", 0)
         extra = fixture.get("status", {}).get("extra")
+        match_date = fixture.get("date", "")
         
         home_team = teams.get("home", {}).get("name", "Casa")
         away_team = teams.get("away", {}).get("name", "Fora")
         home_goals = goals.get("home") if goals.get("home") is not None else 0
         away_goals = goals.get("away") if goals.get("away") is not None else 0
         
-        time_display = f"{elapsed}'"
-        if extra:
-            time_display += f"+{extra}'"
-
-        # Cada jogo fica dentro de um container expansível (clicável para ver estatísticas)
         with st.container():
             st.markdown("<div class='match-card'>", unsafe_allow_html=True)
             
@@ -250,34 +270,44 @@ def render_broadcast_dashboard():
             with col1:
                 st.markdown(f"<h3 style='text-align: right; margin: 0; color: #ffffff;'>{home_team}</h3>", unsafe_allow_html=True)
             with col2:
-                st.markdown(f"<div style='text-align: center;'><span class='live-badge'>AO VIVO {time_display}</span><h2 style='margin: 4px 0 0 0; color: #ffffff;'>{home_goals} x {away_goals}</h2></div>", unsafe_allow_html=True)
+                if status_short in ["1H", "2H", "ET"]:
+                    time_display = f"{elapsed}'"
+                    if extra:
+                        time_display += f"+{extra}'"
+                    st.markdown(f"<div style='text-align: center;'><span class='live-badge'>AO VIVO {time_display}</span><h2 style='margin: 4px 0 0 0; color: #ffffff;'>{home_goals} x {away_goals}</h2></div>", unsafe_allow_html=True)
+                elif status_short == "NS":
+                    countdown = format_countdown(match_date)
+                    st.markdown(f"<div style='text-align: center;'><span class='pre-badge'>{countdown}</span><h3 style='margin: 4px 0 0 0; color: #94a3b8;'>vs</h3></div>", unsafe_allow_html=True)
+                else:
+                    st.markdown(f"<div style='text-align: center;'><span style='color: #94a3b8; font-weight: bold;'>ENCERRADO</span><h2 style='margin: 4px 0 0 0; color: #ffffff;'>{home_goals} x {away_goals}</h2></div>", unsafe_allow_html=True)
             with col3:
                 st.markdown(f"<h3 style='text-align: left; margin: 0; color: #ffffff;'>{away_team}</h3>", unsafe_allow_html=True)
             
-            # Busca estatísticas em tempo real para alimentar o termômetro em barra
-            stats_data = api.fetch_match_statistics(fixture_id)
-            thermometer = calculate_thermometer(stats_data)
+            # Exibe o termômetro em barra apenas se o jogo estiver rolando
+            if status_short in ["1H", "2H", "ET"]:
+                stats_data = api.fetch_match_statistics(fixture_id)
+                thermometer = calculate_thermometer(stats_data)
+                
+                st.markdown(f"""
+                <div class='thermometer-container'>
+                    <div style='display: flex; justify-content: space-between; font-size: 12px; font-weight: bold;'>
+                        <span style='color: #3b82f6;'>{home_team} ({thermometer['home_pct']}%)</span>
+                        <span style='color: #f87171;'>{thermometer['status']}</span>
+                        <span style='color: #ef4444;'>({thermometer['away_pct']}%) {away_team}</span>
+                    </div>
+                    <div class='progress-bar-bg'>
+                        <div style='width: {thermometer['home_pct']}%; background-color: #3b82f6; height: 100%;'></div>
+                        <div style='width: {thermometer['away_pct']}%; background-color: #ef4444; height: 100%;'></div>
+                    </div>
+                    <div style='text-align: center; font-size: 12px; color: #38bdf8; font-weight: 600;'>
+                        Tendência: {thermometer['trend']}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
             
-            # Renderização visual da barra de progresso do termômetro
-            st.markdown(f"""
-            <div class='thermometer-container'>
-                <div style='display: flex; justify-content: space-between; font-size: 12px; font-weight: bold;'>
-                    <span style='color: #3b82f6;'>{home_team} ({thermometer['home_pct']}%)</span>
-                    <span style='color: #f87171;'>{thermometer['status']}</span>
-                    <span style='color: #ef4444;'>({thermometer['away_pct']}%) {away_team}</span>
-                </div>
-                <div class='progress-bar-bg'>
-                    <div style='width: {thermometer['home_pct']}%; background-color: #3b82f6; height: 100%;'></div>
-                    <div style='width: {thermometer['away_pct']}%; background-color: #ef4444; height: 100%;'></div>
-                </div>
-                <div style='text-align: center; font-size: 12px; color: #38bdf8; font-weight: 600;'>
-                    Tendência: {thermometer['trend']}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Botão interativo / Expander para abrir as estatísticas detalhadas ao clicar no jogo
+            # Botão interativo para ver estatísticas detalhadas de qualquer jogo do dia
             with st.expander("📊 Clique para ver Estatísticas Detalhadas (Posse, Chutes, Escanteios)"):
+                stats_data = api.fetch_match_statistics(fixture_id)
                 if stats_data and len(stats_data) >= 2:
                     st.markdown("#### Comparativo da Partida")
                     
@@ -304,7 +334,7 @@ def render_broadcast_dashboard():
                         with col_m3:
                             st.markdown(f"<div style='text-align: left; font-weight: bold;'>{val_a}</div>", unsafe_allow_html=True)
                 else:
-                    st.info("Estatísticas detalhadas indisponíveis no momento para este confronto.")
+                    st.info("Estatísticas detalhadas indisponíveis para este confronto no momento.")
             
             st.markdown("</div>", unsafe_allow_html=True)
 
