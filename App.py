@@ -165,7 +165,7 @@ def render_live_ticker():
         content = " &nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp; ".join(ticker_matches)
         st.markdown(f"""
         <div style="background-color: #1e293b; padding: 10px; border-radius: 8px; border: 1px solid #334155; margin-bottom: 20px;">
-            <div style="font-size: 11px; color: #22c55e; font-weight: bold; margin-bottom: 4px;">🟢 TICKER AO VIVO (PLACAR EM TEMPO REAL)</div>
+            <div style="font-size: 11px; color: #22c55e; font-weight: bold; margin-bottom: 4px;">🟢 AO VIVO (PLACAR EM TEMPO REAL)</div>
             <marquee behavior="scroll" direction="left" scrollamount="4" style="color: white; font-weight: bold; font-size: 14px;">
                 {content}
             </marquee>
