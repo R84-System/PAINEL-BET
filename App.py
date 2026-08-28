@@ -1,6 +1,6 @@
 import streamlit as st
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime
 
 st.set_page_config(
     page_title="Painel de Futebol - APIFootball.com",
@@ -31,19 +31,18 @@ st.markdown(f"Liga selecionada: **{selected_league_name}**")
 
 @st.cache_data(ttl=30)
 def fetch_events(lid):
-    # Janela ampliada para garantir que pega os jogos de hoje e próximos dias
-    from_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-    to_date = (datetime.now() + timedelta(days=3)).strftime("%Y-%m-%d")
+    # Busca focada apenas no dia de hoje para evitar lentidão e timeouts
+    today = datetime.now().strftime("%Y-%m-%d")
     
     params = {
         "action": "get_events",
-        "from": from_date,
-        "to": to_date,
+        "from": today,
+        "to": today,
         "league_id": lid,
         "APIkey": API_KEY
     }
     try:
-        res = requests.get(BASE_URL, params=params, timeout=15)
+        res = requests.get(BASE_URL, params=params, timeout=10)
         if res.status_code == 200:
             data = res.json()
             if isinstance(data, list):
@@ -60,9 +59,9 @@ if api_error:
     st.error(f"⚠️ Erro ao comunicar com a API: {api_error}")
 
 if not matches:
-    st.info("Nenhuma partida encontrada para esta liga no período atual. Verifique se há rodada hoje.")
+    st.info("Nenhuma partida programada para hoje nesta liga.")
 else:
-    st.success(f"{len(matches)} partida(s) encontrada(s)!")
+    st.success(f"{len(matches)} partida(s) encontrada(s) para hoje!")
     
     for m in matches:
         home = m.get("match_hometeam_name", "Casa")
@@ -82,8 +81,8 @@ else:
             elif status in ["FT", "Finished"]:
                 st.markdown(f"<div style='text-align: center;'><span style='color:#94a3b8; font-weight:bold;'>ENCERRADO</span><h2 style='color:#fff; margin:4px 0;'>{h_goals} x {a_goals}</h2></div>", unsafe_allow_html=True)
             else:
-                # Partida não iniciada (mostra a data e horário agendado)
-                st.markdown(f"<div style='text-align: center;'><span style='background-color:#3b82f6; color:white; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:bold;'>🕒 {date_match} {time_match}</span><h3 style='color:#94a3b8; margin:4px 0;'>vs</h3></div>", unsafe_allow_html=True)
+                # Jogo ainda não começou (exibe o horário agendado)
+                st.markdown(f"<div style='text-align: center;'><span style='background-color:#3b82f6; color:white; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:bold;'>🕒 {time_match}</span><h3 style='color:#94a3b8; margin:4px 0;'>vs</h3></div>", unsafe_allow_html=True)
         with col3:
             st.markdown(f"<h3 style='text-align: left; color: #fff;'>{away}</h3>", unsafe_allow_html=True)
         st.divider()
