@@ -1,10 +1,10 @@
 """
 Painel Inteligente de Futebol para Transmissões ao Vivo
-Estilo Profissional (Padrão Live TikTok) - Arquitetura Sênior
+Cobertura Global de Ligas - Correção de Fuso e Temporada Dinâmica
 """
 
 import streamlit as st
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import requests
 
 # =====================================================================
@@ -12,10 +12,10 @@ import requests
 # =====================================================================
 
 LEAGUES = {
+    "🇮🇹 Serie A (Itália)": 135,
     "🇧🇷 Brasileirão Série A": 71,
     "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League (Inglaterra)": 39,
     "🇪🇸 La Liga (Espanha)": 140,
-    "🇮🇹 Serie A (Itália)": 135,
     "🇩🇪 Bundesliga (Alemanha)": 78,
     "🇫🇷 Ligue 1 (França)": 61,
     "🇵🇹 Primeira Liga (Portugal)": 94,
@@ -36,7 +36,7 @@ UI_THEME = {
 }
 
 # =====================================================================
-# BLOCO 2: CLIENTE DE API (INTEGRAÇÃO COM A API-FOOTBALL)
+# BLOCO 2: CLIENTE DE API COM TEMPORADA DINÂMICA
 # =====================================================================
 
 class FootballAPIClient:
@@ -48,14 +48,30 @@ class FootballAPIClient:
             "x-rapidapi-host": "v3.football.api-sports.io"
         }
 
+    def _get_active_season(self, league_id: int) -> int:
+        """Calcula dinamicamente o ano da temporada com base no mês atual e na liga."""
+        now = datetime.now()
+        year = now.year
+        # Ligas sul-americanas e MLS usam o ano corrente (ex: 2026)
+        if league_id in [71, 128, 253]:
+            return year
+        # Ligas europeias que começam no meio do ano (ex: Serie A, Premier League, Champions)
+        # Se estivermos entre janeiro e junho, a temporada começou no ano anterior.
+        if now.month < 7:
+            return year - 1
+        return year
+
     def get_fixtures_by_date(self, league_id: int, date_str: str) -> list:
         if not self.api_key:
             return []
+        season = self._get_active_season(league_id)
         try:
-            url = f"{self.base_url}/fixtures?league={league_id}&season=2026&date={date_str}"
+            url = f"{self.base_url}/fixtures?league={league_id}&season={season}&date={date_str}"
             response = requests.get(url, headers=self.headers, timeout=10)
             if response.status_code == 200:
-                return response.json().get("response", [])
+                data = response.json().get("response", [])
+                # Se não achar nada na data exata por causa de fuso, busca a gama do dia local
+                return data
             return []
         except requests.exceptions.RequestException:
             return []
@@ -73,7 +89,7 @@ class FootballAPIClient:
             return []
 
 # =====================================================================
-# BLOCO 3: MOTOR ANALÍTICO E CRONÔMETRO DIGITAL ESTILO LIVE
+# BLOCO 3: MOTOR ANALÍTICO E CRONÔMETRO DIGITAL
 # =====================================================================
 
 class MatchAnalyticsEngine:
@@ -121,10 +137,9 @@ class MatchAnalyticsEngine:
 
     @staticmethod
     def get_match_timer_info(match_date_str: str) -> tuple:
-        """Retorna o cronômetro em formato HH:MM:SS e o horário local da partida."""
         try:
             match_time = datetime.fromisoformat(match_date_str.replace("Z", "+00:00"))
-            local_time_str = match_time.strftime("%H:%M")
+            local_time_str = match_time.astimezone().strftime("%H:%M")
             
             now = datetime.now(timezone.utc)
             diff = match_time - now
@@ -143,7 +158,7 @@ class MatchAnalyticsEngine:
             return "--:--:--", "00:00"
 
 # =====================================================================
-# BLOCO 4: DESIGN DE INTERFACE E ESTILOS VISUAIS (TEMA LIVE)
+# BLOCO 4: DESIGN DE INTERFACE E ESTILOS VISUAIS
 # =====================================================================
 
 def configure_page_styles():
@@ -214,7 +229,7 @@ def render_sidebar_admin():
             st.info("Insira a senha 'admin123' para alternar as ligas.")
 
 # =====================================================================
-# BLOCO 5: CONTROLADOR PRINCIPAL DA APLICAÇÃO (ATUALIZAÇÃO A CADA 1S)
+# BLOCO 5: CONTROLADOR PRINCIPAL DA APLICAÇÃO
 # =====================================================================
 
 configure_page_styles()
@@ -234,11 +249,19 @@ st.markdown("<h2 style='text-align: center; color: white; margin-bottom: 20px;'>
 @st.fragment(run_every="1s")
 def render_live_dashboard():
     league_id = st.session_state.selected_league
+    
+    # Busca a data atual considerando margem de segurança UTC para evitar bloqueio de fuso
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     matches = api_client.get_fixtures_by_date(league_id, today_str)
     
+    # Se não achar nada no dia UTC exato, tenta buscar o dia anterior/seguinte caso haja desencontro de fuso horário
     if not matches:
-        st.info("Nenhuma partida agendada para hoje nesta liga.")
+        yesterday_str = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+        tomorrow_str = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%d")
+        matches = api_client.get_fixtures_by_date(league_id, yesterday_str) + api_client.get_fixtures_by_date(league_id, tomorrow_str)
+
+    if not matches:
+        st.info("Nenhuma partida agendada para hoje nesta liga. O painel exibirá os confrontos assim que estiverem disponíveis.")
         return
 
     for match in matches:
