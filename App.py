@@ -7,7 +7,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# CSS com a bolinha verde piscando mais devagar (2 segundos)
+# CSS com a bolinha verde piscando devagar e efeito de LED passando no topo
 st.markdown("""
 <style>
 @keyframes blink {
@@ -25,11 +25,33 @@ st.markdown("""
     margin-right: 6px;
     box-shadow: 0 0 8px #22c55e;
 }
+@keyframes ledScan {
+    0% { left: -50%; }
+    50% { left: 100%; }
+    100% { left: -50%; }
+}
+.led-bar-container {
+    width: 100%;
+    height: 4px;
+    background-color: #334155;
+    position: relative;
+    overflow: hidden;
+    border-radius: 2px;
+    margin: 10px 0 20px 0;
+}
+.led-bar {
+    position: absolute;
+    width: 30%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, #22c55e, transparent);
+    animation: ledScan 2s infinite linear;
+    box-shadow: 0 0 10px #22c55e;
+}
 </style>
 """, unsafe_allow_html=True)
 
 LEAGUES = {
-    "🔴 Todos os Jogos ao Vivo (Global)": "all_live",
+    "🟢 Todos os Jogos ao Vivo (Global)": "all_live",
     "🇧🇷 Brasileirão Série A": "bra.1",
     "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League": "eng.1",
     "🇪🇸 La Liga": "esp.1",
@@ -120,7 +142,7 @@ def calculate_pressure(home_stats, away_stats):
     return h_pct, 100 - h_pct
 
 def get_custom_bar(percentage, side):
-    # Cores atualizadas: Alta = Verde, Neutro = Branco, Baixa/Defensiva = Vermelho
+    # Alta = Verde, Neutro = Branco, Baixa/Defensiva = Vermelho
     if percentage >= 65:
         color, label = "#22c55e", "🔥 Pressão Alta"
     elif percentage >= 35:
@@ -160,7 +182,8 @@ def render_live_panel(slug, league_name, query):
                 if query in ev.get("name", "").lower():
                     matches_to_display.append((l_name, l_slug, ev))
     elif slug == "all_live":
-        st.markdown("### 🔴 Todos os Jogos Ao Vivo no Mundo")
+        st.markdown("### 🟢 Todos os Jogos Ao Vivo no Mundo")
+        st.markdown('<div class="led-bar-container"><div class="led-bar"></div></div>', unsafe_allow_html=True)
         for l_name, l_slug in LEAGUES.items():
             if l_slug == "all_live":
                 continue
