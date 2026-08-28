@@ -274,7 +274,7 @@ dashboard_html = """
                 <option value="bra.2">🇧🇷 Brasileirão Série B</option>
                 <option value="bra.copa_brasil">🇧🇷 Copa do Brasil</option>
                 <option value="conmebol.libertadores">🌎 Copa Libertadores</option>
-                <option value="conmebol.sudamericana">🌎 Copa Sudamericana (Sul-Americana)</option>
+                <option value="conmebol.sudamericana">🌎 Copa Sudamericana</option>
                 <option value="uefa.champions">🇪🇺 Champions League</option>
                 <option value="uefa.europa">🇪🇺 Europa League</option>
                 <option value="eng.1">🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League</option>
@@ -284,19 +284,19 @@ dashboard_html = """
                 <option value="fra.1">🇫🇷 Ligue 1</option>
                 <option value="por.1">🇵🇹 Primeira Liga</option>
                 <option value="ksa.1">🇸🇦 Saudi Pro League</option>
-                <option value="arg.1">🇦🇷 Liga Profesional (Argentina)</option>
-                <option value="mex.1">🇲🇽 Campeonato Mexicano (Liga MX)</option>
+                <option value="arg.1">🇦🇷 Liga Profesional</option>
+                <option value="mex.1">🇲🇽 Liga MX</option>
                 <option value="col.1">🇨🇴 Campeonato Colombiano</option>
                 <option value="ecu.1">🇪🇨 Campeonato do Equador</option>
                 <option value="chi.1">🇨🇱 Liga Chilena</option>
                 <option value="ned.1">🇳🇱 Eredivisie</option>
                 <option value="usa.1">🇺🇸 MLS</option>
-                <option value="fifa.friendly">🌍 Jogos Internacionais / Seleções (FIFA)</option>
+                <option value="fifa.friendly">🌍 Jogos Internacionais</option>
             </select>
         </div>
         <div style="flex-grow: 1;">
             <label style="font-size:12px; color:#94a3b8; display:block; margin-bottom:4px;">Buscar Time</label>
-            <input type="text" id="searchInput" placeholder="Ex: Flamengo, Real Madrid, Al Nassr...">
+            <input type="text" id="searchInput" placeholder="Ex: Flamengo, Real Madrid, Goiás...">
         </div>
     </div>
 
@@ -504,60 +504,60 @@ dashboard_html = """
                 let hRedCount = 0, aRedCount = 0;
                 let goalsHtmlList = [];
 
-                if (summary.details) {
-                    for (let d of summary.details) {
-                        let text = (d.type && d.type.text) ? d.type.text.toLowerCase() : "";
-                        let typeName = (d.type && d.type.name) ? d.type.name.toLowerCase() : "";
-                        let isHome = d.team && d.team.id === homeTeamId;
-                        let isAway = d.team && d.team.id === awayTeamId;
+                // Unificar fontes de detalhes (Scoreboard details + Summary scoringPlays / details)
+                let allDetails = [];
+                if (competition.details) allDetails = allDetails.concat(competition.details);
+                if (summary.details) allDetails = allDetails.concat(summary.details);
+                if (summary.scoringPlays) {
+                    for (let sp of summary.scoringPlays) {
+                        allDetails.push({
+                            type: { name: "goal", text: sp.type?.text || "Goal" },
+                            clock: sp.clock,
+                            team: sp.team,
+                            athlete: sp.athlete,
+                            athletesInvolved: sp.athletesInvolved
+                        });
+                    }
+                }
 
-                        if (text.includes("yellow card") || text.includes("cartão amarelo") || typeName.includes("yellow") || typeName.includes("yellowcard")) {
-                            if (isHome) hYellowCount++;
-                            if (isAway) aYellowCount++;
-                        }
-                        if (text.includes("red card") || text.includes("cartão vermelho") || typeName.includes("red") || typeName.includes("redcard")) {
-                            if (isHome) hRedCount++;
-                            if (isAway) aRedCount++;
+                for (let d of allDetails) {
+                    let text = (d.type && d.type.text) ? d.type.text.toLowerCase() : "";
+                    let typeName = (d.type && d.type.name) ? d.type.name.toLowerCase() : "";
+                    let isHome = d.team && d.team.id === homeTeamId;
+                    let isAway = d.team && d.team.id === awayTeamId;
+
+                    if (text.includes("yellow card") || text.includes("cartão amarelo") || typeName.includes("yellow") || typeName.includes("yellowcard")) {
+                        if (isHome) hYellowCount++;
+                        if (isAway) aYellowCount++;
+                    }
+                    if (text.includes("red card") || text.includes("cartão vermelho") || typeName.includes("red") || typeName.includes("redcard")) {
+                        if (isHome) hRedCount++;
+                        if (isAway) aRedCount++;
+                    }
+                    if (text.includes("goal") || text.includes("gol") || typeName.includes("goal")) {
+                        let scorer = "Gol";
+                        if (d.athlete && d.athlete.displayName) scorer = d.athlete.displayName;
+                        else if (d.athletesInvolved && d.athletesInvolved[0] && d.athletesInvolved[0].displayName) scorer = d.athletesInvolved[0].displayName;
+                        
+                        let clockVal = (d.clock && d.clock.displayValue) ? d.clock.displayValue : "";
+                        let isOwn = text.includes("own goal") || text.includes("contra");
+                        
+                        let goalStr = `⚽ <b>${scorer}${isOwn ? ' (Contra)' : ''}</b> ${clockVal ? '(' + clockVal + "')" : ''}`;
+                        if (!goalsHtmlList.includes(goalStr)) {
+                            goalsHtmlList.push(goalStr);
                         }
                     }
                 }
 
-                let scoringEvents = summary.scoringPlays || [];
-                if (scoringEvents.length > 0) {
-                    for (let sp of scoringEvents) {
-                        let scorer = (sp.athlete && sp.athlete.displayName) ? sp.athlete.displayName : "Gol";
-                        let clockVal = (sp.clock && sp.clock.displayValue) ? sp.clock.displayValue : "";
-                        let isOwn = (sp.type && sp.type.text && sp.type.text.toLowerCase().includes("own goal")) || false;
-                        goalsHtmlList.push(`⚽ <b>${scorer}${isOwn ? ' (Contra)' : ''}</b> (${clockVal}')`);
-                    }
-                } else if (summary.details) {
-                    for (let d of summary.details) {
-                        let text = (d.type && d.type.text) ? d.type.text.toLowerCase() : "";
-                        let typeName = (d.type && d.type.name) ? d.type.name.toLowerCase() : "";
-                        if (text.includes("goal") || text.includes("gol") || typeName.includes("goal")) {
-                            let scorer = (d.athlete && d.athlete.displayName) ? d.athlete.displayName : (d.athletesInvolved && d.athletesInvolved[0] ? d.athletesInvolved[0].displayName : "Gol");
-                            let clockVal = (d.clock && d.clock.displayValue) ? d.clock.displayValue : "";
-                            let isOwn = text.includes("own goal") || text.includes("contra");
-                            goalsHtmlList.push(`⚽ <b>${scorer}${isOwn ? ' (Contra)' : ''}</b> (${clockVal}')`);
-                        }
-                    }
-                }
+                let hBadges = `<div style="text-align:right; margin-bottom:4px; display:flex; justify-content:flex-end; gap:4px;">
+                    <span class="yellow-card">🟨 ${hYellowCount}</span>
+                    <span class="red-card">🟥 ${hRedCount}</span>
+                </div>`;
 
-                let hBadges = '';
-                if (hYellowCount > 0 || hRedCount > 0) {
-                    hBadges += `<div style="text-align:right; margin-bottom:4px; display:flex; justify-content:flex-end; gap:4px;">`;
-                    if (hYellowCount > 0) hBadges += `<span class="yellow-card">🟨 ${hYellowCount}</span>`;
-                    if (hRedCount > 0) hBadges += `<span class="red-card">🟥 ${hRedCount}</span>`;
-                    hBadges += `</div>`;
-                }
-
-                let aBadges = '';
-                if (aYellowCount > 0 || aRedCount > 0) {
-                    aBadges += `<div style="text-align:left; margin-bottom:4px; display:flex; justify-content:flex-start; gap:4px;">`;
-                    if (aYellowCount > 0) aBadges += `<span class="yellow-card">🟨 ${aYellowCount}</span>`;
-                    if (aRedCount > 0) aBadges += `<span class="red-card">🟥 ${aRedCount}</span>`;
-                    aBadges += `</div>`;
-                }
+                let aBadges = `<div style="text-align:left; margin-bottom:4px; display:flex; justify-content:flex-start; gap:4px;">
+                    <span class="yellow-card">🟨 ${aYellowCount}</span>
+                    <span class="red-card">🟥 ${aRedCount}</span>
+                </div>`;
 
                 let centerBadge = "";
                 let isHalftime = (statusName === 'STATUS_HALFTIME' || rawDetail.toLowerCase().includes('halftime') || rawDetail.toLowerCase().includes('intervalo'));
