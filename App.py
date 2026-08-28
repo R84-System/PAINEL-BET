@@ -1,358 +1,169 @@
-"""
-Painel Inteligente de Futebol para Transmissões ao Vivo
-Cobertura Global de Ligas - Com Detecção Prioritária de Jogos ao Vivo
-"""
-
 import streamlit as st
-from datetime import datetime, timezone, timedelta
 import requests
+from datetime import datetime, timezone
 
-# =====================================================================
-# BLOCO 1: CONFIGURAÇÕES E MAPA GLOBAL DE LIGAS (PRIMEIRAS DIVISÕES)
-# =====================================================================
+# Configuração da página
+st.set_page_config(
+    page_title="Painel de Futebol - Football-Data.org",
+    page_icon="⚽",
+    layout="wide"
+)
 
+# Barra lateral para configurações
+st.sidebar.title("⚙️ Configurações")
+api_key = st.sidebar.text_input("Insira sua Chave da API", type="password", value="")
+st.sidebar.markdown("""
+---
+**Como obter sua chave gratuita:**
+1. Acesse [football-data.org](https://www.football-data.org/).
+2. Cadastre-se gratuitamente.
+3. Copie sua chave de API (X-Auth-Token) e cole no campo acima.
+""")
+
+# Dicionário de Ligas suportadas pela API gratuita
 LEAGUES = {
-    "🇧🇷 Brasileirão Série A": 71,
-    "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League (Inglaterra)": 39,
-    "🇪🇸 La Liga (Espanha)": 140,
-    "🇮🇹 Serie A (Itália)": 135,
-    "🇩🇪 Bundesliga (Alemanha)": 78,
-    "🇫🇷 Ligue 1 (França)": 61,
-    "🇵🇹 Primeira Liga (Portugal)": 94,
-    "🇳🇱 Eredivisie (Holanda)": 88,
-    "🇦🇷 Liga Profesional (Argentina)": 128,
-    "🇺🇸 MLS (Estados Unidos)": 253,
-    "🇸🇦 Saudi Pro League (Arábia Saudita)": 307,
-    "🌎 Copa Libertadores": 13,
-    "🇪🇺 Champions League": 2,
+    "🇧🇷 Brasileirão Série A": "BSA",
+    "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League": "PL",
+    "🇪🇸 La Liga": "PD",
+    "🇮🇹 Serie A (Itália)": "SA",
+    "🇩🇪 Bundesliga": "BL1",
+    "🇫🇷 Ligue 1": "FL1",
+    "🇵🇹 Primeira Liga": "PPL",
+    "🇪🇺 Champions League": "CL"
 }
 
-UI_THEME = {
-    "bg_color": "#0e1117",
-    "card_bg": "#16192b",
-    "text_primary": "#ffffff",
-    "accent_live": "#ff4b4b",
-    "accent_home": "#3b82f6",
-    "accent_away": "#ef4444",
-}
+selected_league_name = st.sidebar.selectbox("Selecione a Competição", list(LEAGUES.keys()))
+league_code = LEAGUES[selected_league_name]
 
-# =====================================================================
-# BLOCO 2: CLIENTE DE API (BUSCA INTELIGENTE DE AO VIVO + DATAS)
-# =====================================================================
+# Cabeçalho Principal
+st.title("⚽ Painel de Futebol ao Vivo & Classificação")
+st.markdown(f"Competição selecionada: **{selected_league_name}**")
 
-class FootballAPIClient:
-    def __init__(self):
-        self.api_key = "c6c045752fef0a0759a2447ec070dbdd064f9a61d55c52fd1d59a052612f1da0"
-        self.base_url = "https://api-football-v1.p.rapidapi.com/v3"
-        self.headers = {
-            "x-rapidapi-key": self.api_key,
-            "x-rapidapi-host": "api-football-v1.p.rapidapi.com"
-        }
+if not api_key:
+    st.warning("⚠️ Por favor, insira sua chave da API do **football-data.org** na barra lateral para carregar os dados.")
+else:
+    headers = {"X-Auth-Token": api_key}
+    base_url = "https://api.football-data.org/v4"
 
-    def _get_active_season(self, league_id: int) -> int:
-        now = datetime.now()
-        year = now.year
-        if league_id in [71, 128, 253]:
-            return year
-        if now.month < 7:
-            return year - 1
-        return year
-
-    def get_live_fixtures(self, league_id: int) -> list:
-        if not self.api_key:
-            return []
+    # Função para buscar partidas com cache de 60 segundos
+    @st.cache_data(ttl=60)
+    def fetch_matches(code):
         try:
-            url = f"{self.base_url}/fixtures?live=all"
-            response = requests.get(url, headers=self.headers, timeout=10)
+            url = f"{base_url}/competitions/{code}/matches"
+            response = requests.get(url, headers=headers, timeout=10)
             if response.status_code == 200:
-                data = response.json()
-                all_live = data.get("response", [])
-                # Filtra apenas os jogos ao vivo da liga selecionada
-                league_live = [m for m in all_live if m.get("league", {}).get("id") == league_id]
-                return league_live
-            return []
-        except requests.exceptions.RequestException:
-            return []
-
-    def get_fixtures_by_date(self, league_id: int, date_str: str) -> list:
-        if not self.api_key:
-            return []
-        
-        season = self._get_active_season(league_id)
-        try:
-            url = f"{self.base_url}/fixtures?league={league_id}&season={season}&date={date_str}"
-            response = requests.get(url, headers=self.headers, timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                return data.get("response", [])
-            return []
-        except requests.exceptions.RequestException:
-            return []
-
-    def get_fixture_statistics(self, fixture_id: int) -> list:
-        if not self.api_key:
-            return []
-        try:
-            url = f"{self.base_url}/fixtures/statistics?fixture={fixture_id}"
-            response = requests.get(url, headers=self.headers, timeout=10)
-            if response.status_code == 200:
-                return response.json().get("response", [])
-            return []
-        except requests.exceptions.RequestException:
-            return []
-
-# =====================================================================
-# BLOCO 3: MOTOR ANALÍTICO E CRONÔMETRO REVERSO INTELIGENTE
-# =====================================================================
-
-class MatchAnalyticsEngine:
-    @staticmethod
-    def calculate_thermometer(stats_data: list) -> dict:
-        if not stats_data or len(stats_data) < 2:
-            return {"home_pct": 50, "away_pct": 50, "status": "Equilibrado ⚖️", "trend": "Estudo em campo"}
-        
-        try:
-            home_stats = {s["type"]: s["value"] for s in stats_data[0].get("statistics", [])}
-            away_stats = {s["type"]: s["value"] for s in stats_data[1].get("statistics", [])}
-            
-            def parse_metric(val):
-                if not val: return 0
-                if isinstance(val, str) and "%" in val:
-                    return int(val.replace("%", ""))
-                try:
-                    return int(val)
-                except ValueError:
-                    return 0
-
-            home_score = parse_metric(home_stats.get("Shots on Goal", 0)) * 3 + parse_metric(home_stats.get("Total Shots", 0))
-            away_score = parse_metric(away_stats.get("Shots on Goal", 0)) * 3 + parse_metric(away_stats.get("Total Shots", 0))
-            
-            total = home_score + away_score
-            if total == 0:
-                return {"home_pct": 50, "away_pct": 50, "status": "Equilibrado ⚖️", "trend": "Sem finalizações"}
-            
-            home_pct = int((home_score / total) * 100)
-            away_pct = 100 - home_pct
-            
-            if home_pct > 65:
-                status = "Pressão Forte 🔴"
-                trend = f"{stats_data[0]['team']['name']} sufocando"
-            elif away_pct > 65:
-                status = "Pressão Forte 🔵"
-                trend = f"{stats_data[1]['team']['name']} sufocando"
+                return response.json().get("matches", [])
             else:
-                status = "Lado a Lado ⚖️"
-                trend = "Jogo Aberto"
-                
-            return {"home_pct": home_pct, "away_pct": away_pct, "status": status, "trend": trend}
-        except Exception:
-            return {"home_pct": 50, "away_pct": 50, "status": "Equilibrado ⚖️", "trend": "Indisponível"}
+                st.error(f"Erro na API (Partidas): Código {response.status_code}")
+                return []
+        except Exception as e:
+            st.error(f"Erro de conexão: {e}")
+            return []
 
-    @staticmethod
-    def format_countdown(match_date_str: str) -> str:
+    # Função para buscar tabela de classificação com cache de 5 minutos
+    @st.cache_data(ttl=300)
+    def fetch_standings(code):
         try:
-            match_time = datetime.fromisoformat(match_date_str.replace("Z", "+00:00"))
-            now = datetime.now(timezone.utc)
-            diff = match_time - now
-            total_seconds = int(diff.total_seconds())
-            
-            if total_seconds <= 0:
-                return "Iniciando..."
-            
-            if total_seconds <= 3600:
-                minutes = total_seconds // 60
-                seconds = total_seconds % 60
-                return f"⚠️ Começa em {minutes:02d}m {seconds:02d}s"
-            
-            hours = total_seconds // 3600
-            rem_mins = (total_seconds % 3600) // 60
-            return f"Inicia em {hours}h {rem_mins}m"
+            url = f"{base_url}/competitions/{code}/standings"
+            response = requests.get(url, headers=headers, timeout=10)
+            if response.status_code == 200:
+                return response.json().get("standings", [])
+            else:
+                return []
         except Exception:
-            return "Pré-jogo"
+            return []
 
-# =====================================================================
-# BLOCO 4: DESIGN DE INTERFACE E ESTILOS CSS
-# =====================================================================
+    with st.spinner("Carregando dados da API..."):
+        matches = fetch_matches(league_code)
+        standings = fetch_standings(league_code)
 
-def configure_page_styles():
-    st.set_page_config(
-        page_title="Central Inteligente de Partidas",
-        page_icon="⚽",
-        layout="wide",
-        initial_sidebar_state="collapsed"
-    )
-    st.markdown(
-        f"""
-        <style>
-        .stApp {{ background-color: {UI_THEME['bg_color']}; }}
-        .match-card {{
-            background-color: {UI_THEME['card_bg']};
-            border-radius: 12px;
-            padding: 16px;
-            margin-bottom: 14px;
-            border: 1px solid #252a41;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        }}
-        .live-badge {{
-            background-color: {UI_THEME['accent_live']};
-            color: white; padding: 4px 10px; border-radius: 4px;
-            font-size: 11px; font-weight: 700;
-        }}
-        .pre-badge {{
-            background-color: #3b82f6;
-            color: white; padding: 4px 10px; border-radius: 4px;
-            font-size: 11px; font-weight: 700;
-        }}
-        .thermometer-box {{
-            margin-top: 12px; background-color: #121522;
-            padding: 10px 14px; border-radius: 8px; border: 1px solid #22273d;
-        }}
-        .progress-bar-bg {{
-            background-color: #2a2f45; border-radius: 4px;
-            overflow: hidden; height: 10px; display: flex; width: 100%;
-            margin-top: 6px; margin-bottom: 6px;
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
+    # Abas para separar Partidas e Classificação
+    tab_matches, tab_standings = st.tabs(["📅 Partidas", "🏆 Tabela de Classificação"])
 
-def render_sidebar_admin():
-    with st.sidebar:
-        st.markdown("### ⚙️ Painel ADM (Controle)")
-        st.divider()
-        
-        password = st.text_input("Senha de Acesso", type="password")
-        if password == "admin123":
-            st.session_state.admin_mode = True
-            st.success("Acesso Autorizado")
-        
-        if st.session_state.get("admin_mode", False):
-            selected_name = st.selectbox("Campeonato Mundial", options=list(LEAGUES.keys()))
-            st.session_state.selected_league = LEAGUES[selected_name]
+    with tab_matches:
+        st.subheader("Partidas da Competição")
+        if not matches:
+            st.info("Nenhuma partida encontrada ou chave inválida.")
         else:
-            st.info("Insira a senha 'admin123' para alternar as ligas mundiais.")
-
-# =====================================================================
-# BLOCO 5: CONTROLADOR PRINCIPAL DA APLICAÇÃO
-# =====================================================================
-
-configure_page_styles()
-
-if "admin_mode" not in st.session_state:
-    st.session_state.admin_mode = False
-if "selected_league" not in st.session_state:
-    st.session_state.selected_league = list(LEAGUES.values())[0]
-
-api_client = FootballAPIClient()
-analytics = MatchAnalyticsEngine()
-
-render_sidebar_admin()
-
-st.title("⚽ Painel Inteligente de Partidas (Global)")
-
-@st.fragment(run_every="5s")
-def render_live_dashboard():
-    league_id = st.session_state.selected_league
-    
-    # 1. Tenta buscar primeiro os jogos que estão AO VIVO agora mesmo
-    matches = api_client.get_live_fixtures(league_id)
-    
-    # 2. Se não houver jogos ao vivo, busca na data de hoje
-    if not matches:
-        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        matches = api_client.get_fixtures_by_date(league_id, today_str)
-
-    # 3. Se ainda não houver, busca ontem e amanhã como fallback
-    if not matches:
-        yesterday_str = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
-        tomorrow_str = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%d")
-        matches_yes = api_client.get_fixtures_by_date(league_id, yesterday_str)
-        matches_tom = api_client.get_fixtures_by_date(league_id, tomorrow_str)
-        matches = matches_yes + matches_tom
-
-    if not matches:
-        st.info("Nenhuma partida encontrada recentemente para esta liga.")
-        return
-
-    for match in matches:
-        fixture = match.get("fixture", {})
-        teams = match.get("teams", {})
-        goals = match.get("goals", {})
-        
-        fixture_id = fixture.get("id")
-        status_short = fixture.get("status", {}).get("short", "NS")
-        elapsed = fixture.get("status", {}).get("elapsed", 0)
-        extra = fixture.get("status", {}).get("extra")
-        match_date = fixture.get("date", "")
-        
-        home_team = teams.get("home", {}).get("name", "Casa")
-        away_team = teams.get("away", {}).get("name", "Fora")
-        home_goals = goals.get("home") if goals.get("home") is not None else 0
-        away_goals = goals.get("away") if goals.get("away") is not None else 0
-        
-        with st.container():
-            st.markdown("<div class='match-card'>", unsafe_allow_html=True)
+            # Filtrar jogos ao vivo primeiro, se houver
+            live_matches = [m for m in matches if m.get("status") in ["LIVE", "IN_PLAY", "PAUSED"]]
             
-            col1, col2, col3 = st.columns([3, 2, 3])
-            with col1:
-                st.markdown(f"<h3 style='text-align: right; margin: 0; color: #fff;'>{home_team}</h3>", unsafe_allow_html=True)
-            with col2:
-                if status_short in ["1H", "2H", "ET"]:
-                    time_str = f"{elapsed}'" + (f"+{extra}'" if extra else "")
-                    st.markdown(f"<div style='text-align: center;'><span class='live-badge'>AO VIVO {time_str}</span><h2 style='margin: 4px 0 0 0; color: #fff;'>{home_goals} x {away_goals}</h2></div>", unsafe_allow_html=True)
-                elif status_short == "NS":
-                    countdown = analytics.format_countdown(match_date)
-                    st.markdown(f"<div style='text-align: center;'><span class='pre-badge'>{countdown}</span><h3 style='margin: 4px 0 0 0; color: #94a3b8;'>vs</h3></div>", unsafe_allow_html=True)
-                else:
-                    st.markdown(f"<div style='text-align: center;'><span style='color: #94a3b8; font-weight: bold;'>ENCERRADO</span><h2 style='margin: 4px 0 0 0; color: #fff;'>{home_goals} x {away_goals}</h2></div>", unsafe_allow_html=True)
-            with col3:
-                st.markdown(f"<h3 style='text-align: left; margin: 0; color: #fff;'>{away_team}</h3>", unsafe_allow_html=True)
+            now_utc = datetime.now(timezone.utc)
+            today_str = now_utc.strftime("%Y-%m-%d")
+            today_matches = [m for m in matches if m.get("utcDate", "").startswith(today_str)]
             
-            if status_short in ["1H", "2H", "ET"]:
-                stats_data = api_client.get_fixture_statistics(fixture_id)
-                thermometer = analytics.calculate_thermometer(stats_data)
+            # Prioriza exibição de jogos ao vivo ou do dia atual
+            display_matches = live_matches if live_matches else (today_matches if today_matches else matches[:20])
+            
+            if live_matches:
+                st.markdown("🔴 **PARTIDAS AO VIVO AGORA**")
+            
+            for m in display_matches:
+                home = m.get("homeTeam", {}).get("name", "Casa")
+                away = m.get("awayTeam", {}).get("name", "Fora")
                 
-                st.markdown(f"""
-                <div class='thermometer-box'>
-                    <div style='display: flex; justify-content: space-between; font-size: 12px; font-weight: bold;'>
-                        <span style='color: #3b82f6;'>{home_team} ({thermometer['home_pct']}%)</span>
-                        <span style='color: #f87171;'>{thermometer['status']}</span>
-                        <span style='color: #ef4444;'>({thermometer['away_pct']}%) {away_team}</span>
-                    </div>
-                    <div class='progress-bar-bg'>
-                        <div style='width: {thermometer['home_pct']}%; background-color: #3b82f6; height: 100%;'></div>
-                        <div style='width: {thermometer['away_pct']}%; background-color: #ef4444; height: 100%;'></div>
-                    </div>
-                    <div style='text-align: center; font-size: 12px; color: #38bdf8; font-weight: 600;'>
-                        Tendência: {thermometer['trend']}
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            with st.expander("📊 Estatísticas Detalhadas da Partida"):
-                stats_data = api_client.get_fixture_statistics(fixture_id)
-                if stats_data and len(stats_data) >= 2:
-                    h_stats = {s["type"]: s["value"] for s in stats_data[0].get("statistics", [])}
-                    a_stats = {s["type"]: s["value"] for s in stats_data[1].get("statistics", [])}
-                    
-                    metrics = [
-                        ("Ball Possession", "Posse de Bola"),
-                        ("Shots on Goal", "Chutes ao Gol"),
-                        ("Total Shots", "Total de Finalizações"),
-                        ("Corner Kicks", "Escanteios"),
-                        ("Yellow Cards", "Cartões Amarelos"),
-                        ("Fouls", "Faltas")
-                    ]
-                    
-                    for key, label in metrics:
-                        c1, c2, c3 = st.columns([2, 2, 2])
-                        with c1: st.markdown(f"<div style='text-align: right; font-weight: bold;'>{h_stats.get(key, 0)}</div>", unsafe_allow_html=True)
-                        with c2: st.markdown(f"<div style='text-align: center; color: #94a3b8; font-size: 13px;'>{label}</div>", unsafe_allow_html=True)
-                        with c3: st.markdown(f"<div style='text-align: left; font-weight: bold;'>{a_stats.get(key, 0)}</div>", unsafe_allow_html=True)
-                else:
-                    st.info("Estatísticas detalhadas indisponíveis no momento.")
-            
-            st.markdown("</div>", unsafe_allow_html=True)
+                score = m.get("score", {})
+                ft = score.get("fullTime", {})
+                home_goals = ft.get("home") if ft.get("home") is not None else "-"
+                away_goals = ft.get("away") if ft.get("away") is not None else "-"
+                
+                status = m.get("status", "SCHEDULED")
+                utc_date = m.get("utcDate", "")
+                
+                time_str = "A definir"
+                if utc_date:
+                    try:
+                        dt = datetime.fromisoformat(utc_date.replace("Z", "+00:00"))
+                        time_str = dt.strftime("%d/%m/%Y %H:%M (UTC)")
+                    except:
+                        pass
 
-render_live_dashboard()
+                col1, col2, col3, col4 = st.columns([3, 1, 1, 2])
+                with col1:
+                    st.write(f"**{home}** vs **{away}**")
+                with col2:
+                    st.markdown(f"### {home_goals} x {away_goals}")
+                with col3:
+                    if status in ["LIVE", "IN_PLAY"]:
+                        st.markdown(":red[**AO VIVO**]")
+                    elif status == "FINISHED":
+                        st.markdown("Fim de Jogo")
+                    else:
+                        st.markdown(f"🕒 {time_str}")
+                with col4:
+                    st.write(f"Status: `{status}`")
+                st.divider()
+
+    with tab_standings:
+        st.subheader("Tabela de Classificação Atual")
+        if not standings:
+            st.info("Tabela de classificação indisponível para esta competição no momento.")
+        else:
+            total_table = []
+            for s in standings:
+                if s.get("type") == "TOTAL":
+                    total_table = s.get("table", [])
+                    break
+            
+            if not total_table and standings:
+                total_table = standings[0].get("table", [])
+                
+            if total_table:
+                table_data = []
+                for row in total_table:
+                    team_name = row.get("team", {}).get("name", "")
+                    table_data.append({
+                        "Pos": row.get("position"),
+                        "Time": team_name,
+                        "Pts": row.get("points"),
+                        "J": row.get("playedGames"),
+                        "V": row.get("won"),
+                        "E": row.get("draw"),
+                        "D": row.get("lost"),
+                        "GP": row.get("goalsFor"),
+                        "GC": row.get("goalsAgainst"),
+                        "SG": row.get("goalDifference")
+                    })
+                st.dataframe(table_data, use_container_width=True)
+            else:
+                st.info("Dados de classificação não encontrados.")
