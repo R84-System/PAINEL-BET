@@ -1,6 +1,6 @@
 """
 Painel Inteligente de Futebol para Transmissões ao Vivo
-Cobertura Global de Ligas - Configurado para RapidAPI
+Cobertura Global de Ligas - Com Detecção Prioritária de Jogos ao Vivo
 """
 
 import streamlit as st
@@ -37,14 +37,12 @@ UI_THEME = {
 }
 
 # =====================================================================
-# BLOCO 2: CLIENTE DE API (CONFIGURADO PARA RAPIDAPI)
+# BLOCO 2: CLIENTE DE API (BUSCA INTELIGENTE DE AO VIVO + DATAS)
 # =====================================================================
 
 class FootballAPIClient:
     def __init__(self):
         self.api_key = "c6c045752fef0a0759a2447ec070dbdd064f9a61d55c52fd1d59a052612f1da0"
-        
-        # Configuração correta para chaves da RapidAPI
         self.base_url = "https://api-football-v1.p.rapidapi.com/v3"
         self.headers = {
             "x-rapidapi-key": self.api_key,
@@ -60,6 +58,22 @@ class FootballAPIClient:
             return year - 1
         return year
 
+    def get_live_fixtures(self, league_id: int) -> list:
+        if not self.api_key:
+            return []
+        try:
+            url = f"{self.base_url}/fixtures?live=all"
+            response = requests.get(url, headers=self.headers, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                all_live = data.get("response", [])
+                # Filtra apenas os jogos ao vivo da liga selecionada
+                league_live = [m for m in all_live if m.get("league", {}).get("id") == league_id]
+                return league_live
+            return []
+        except requests.exceptions.RequestException:
+            return []
+
     def get_fixtures_by_date(self, league_id: int, date_str: str) -> list:
         if not self.api_key:
             return []
@@ -68,10 +82,9 @@ class FootballAPIClient:
         try:
             url = f"{self.base_url}/fixtures?league={league_id}&season={season}&date={date_str}"
             response = requests.get(url, headers=self.headers, timeout=10)
-            
             if response.status_code == 200:
-                data_json = response.json()
-                return data_json.get("response", [])
+                data = response.json()
+                return data.get("response", [])
             return []
         except requests.exceptions.RequestException:
             return []
@@ -241,9 +254,16 @@ st.title("⚽ Painel Inteligente de Partidas (Global)")
 @st.fragment(run_every="5s")
 def render_live_dashboard():
     league_id = st.session_state.selected_league
-    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    matches = api_client.get_fixtures_by_date(league_id, today_str)
     
+    # 1. Tenta buscar primeiro os jogos que estão AO VIVO agora mesmo
+    matches = api_client.get_live_fixtures(league_id)
+    
+    # 2. Se não houver jogos ao vivo, busca na data de hoje
+    if not matches:
+        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        matches = api_client.get_fixtures_by_date(league_id, today_str)
+
+    # 3. Se ainda não houver, busca ontem e amanhã como fallback
     if not matches:
         yesterday_str = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
         tomorrow_str = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%d")
@@ -252,7 +272,7 @@ def render_live_dashboard():
         matches = matches_yes + matches_tom
 
     if not matches:
-        st.info("Nenhuma partida agendada recentemente para esta liga. O painel exibirá os confrontos assim que houverem novas rodadas.")
+        st.info("Nenhuma partida encontrada recentemente para esta liga.")
         return
 
     for match in matches:
