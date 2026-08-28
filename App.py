@@ -159,6 +159,9 @@ def render_live_panel(slug, league_name, query):
         status_type = competition.get("status", {}).get("type", {})
         state = status_type.get("state", "pre")
         detail = status_type.get("detail", "")
+        status_obj = competition.get("status", {})
+        display_clock = status_obj.get("displayClock", "")
+        period = status_obj.get("period", 1)
         
         summary = fetch_match_summary(l_slug, event_id)
         stats = extract_stats(summary)
@@ -171,26 +174,100 @@ def render_live_panel(slug, league_name, query):
         with col1:
             st.markdown(f"<h3 style='text-align: right; color: #fff; margin-bottom: 0;'>{home_team}</h3>", unsafe_allow_html=True)
             st.markdown(get_custom_bar(h_press, "home"), unsafe_allow_html=True)
+        
         with col2:
             if state == "in":
-                st.markdown(f"<div style='text-align: center;'><span style='background-color:#ff4b4b; color:white; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:bold;'>AO VIVO ({detail})</span><h2 style='color:#fff; margin:4px 0;'>{home_score} x {away_score}</h2></div>", unsafe_allow_html=True)
+                if period == 1:
+                    period_name = "1º Tempo"
+                elif period == 2:
+                    period_name = "2º Tempo"
+                elif period in [3, 4]:
+                    period_name = "Prorrogação"
+                elif period >= 5 or "pen" in detail.lower() or "pênalt" in detail.lower():
+                    period_name = "Pênaltis"
+                else:
+                    period_name = f"Tempo {period}"
+                
+                clock_display = f" ({display_clock})" if display_clock else f" ({detail})"
+                st.markdown(f"""
+                <div style='text-align: center;'>
+                    <span style='background-color:#ff4b4b; color:white; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:bold;'>
+                        🔴 AO VIVO • {period_name}{clock_display}
+                    </span>
+                    <h2 style='color:#fff; margin:4px 0;'>{home_score} x {away_score}</h2>
+                </div>
+                """, unsafe_allow_html=True)
             elif state == "post":
-                st.markdown(f"<div style='text-align: center;'><span style='color:#94a3b8; font-weight:bold;'>ENCERRADO</span><h2 style='color:#fff; margin:4px 0;'>{home_score} x {away_score}</h2></div>", unsafe_allow_html=True)
+                st.markdown(f"""
+                <div style='text-align: center;'>
+                    <span style='color:#94a3b8; font-weight:bold;'>ENCERRADO</span>
+                    <h2 style='color:#fff; margin:4px 0;'>{home_score} x {away_score}</h2>
+                </div>
+                """, unsafe_allow_html=True)
             else:
-                st.markdown(f"<div style='text-align: center;'><span style='background-color:#3b82f6; color:white; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:bold;'>🕒 {detail}</span><h3 style='color:#94a3b8; margin:4px 0;'>vs</h3></div>", unsafe_allow_html=True)
+                st.markdown(f"""
+                <div style='text-align: center;'>
+                    <span style='background-color:#3b82f6; color:white; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:bold;'>🕒 {detail}</span>
+                    <h3 style='color:#94a3b8; margin:4px 0;'>vs</h3>
+                </div>
+                """, unsafe_allow_html=True)
+                
         with col3:
             st.markdown(f"<h3 style='text-align: left; color: #fff; margin-bottom: 0;'>{away_team}</h3>", unsafe_allow_html=True)
             st.markdown(get_custom_bar(a_press, "away"), unsafe_allow_html=True)
 
         with st.expander(f"📊 Ver Estatísticas Detalhadas ({home_team} vs {away_team})"):
             h_stats, a_stats = stats["home"], stats["away"]
+            
+            # Formatação Posse de Bola com %
+            poss_h = h_stats.get("possessionPct", "0")
+            if not poss_h.endswith("%"):
+                poss_h = f"{poss_h}%" if poss_h != "0" else "0%"
+            poss_a = a_stats.get("possessionPct", "0")
+            if not poss_a.endswith("%"):
+                poss_a = f"{poss_a}%" if poss_a != "0" else "0%"
+
+            # Faltas e Cartões
+            fouls_h = h_stats.get("foulsCommitted", h_stats.get("fouls", "0"))
+            fouls_a = a_stats.get("foulsCommitted", a_stats.get("fouls", "0"))
+            
+            cards_h = f"🟨 {h_stats.get('yellowCards', '0')} | 🟥 {h_stats.get('redCards', '0')}"
+            cards_a = f"🟨 {a_stats.get('yellowCards', '0')} | 🟥 {a_stats.get('redCards', '0')}"
+
             m_col1, m_col2, m_col3 = st.columns([2, 3, 2])
             with m_col1:
-                st.markdown(f"<p style='text-align: right;'><b>{h_stats.get('possessionPct', '0%')}</b><br>{h_stats.get('shotsOnTarget', '0')}<br>{h_stats.get('totalShots', '0')}<br>{h_stats.get('wonCorners', '0')}</p>", unsafe_allow_html=True)
+                st.markdown(f"""
+                <p style='text-align: right;'>
+                    <b>{poss_h}</b><br>
+                    {h_stats.get('shotsOnTarget', '0')}<br>
+                    {h_stats.get('totalShots', '0')}<br>
+                    {h_stats.get('wonCorners', '0')}<br>
+                    {fouls_h}<br>
+                    {cards_h}
+                </p>
+                """, unsafe_allow_html=True)
             with m_col2:
-                st.markdown("<p style='text-align: center; color: #94a3b8;'>Posse de Bola<br>Chutes no Gol<br>Chutes Totais<br>Escanteios</p>", unsafe_allow_html=True)
+                st.markdown("""
+                <p style='text-align: center; color: #94a3b8;'>
+                    Posse de Bola<br>
+                    Chutes no Gol<br>
+                    Chutes Totais<br>
+                    Escanteios<br>
+                    Faltas Cometidas<br>
+                    Cartões (Amarelos | Vermelhos)
+                </p>
+                """, unsafe_allow_html=True)
             with m_col3:
-                st.markdown(f"<p style='text-align: left;'><b>{a_stats.get('possessionPct', '0%')}</b><br>{a_stats.get('shotsOnTarget', '0')}<br>{a_stats.get('totalShots', '0')}<br>{a_stats.get('wonCorners', '0')}</p>", unsafe_allow_html=True)
+                st.markdown(f"""
+                <p style='text-align: left;'>
+                    <b>{poss_a}</b><br>
+                    {a_stats.get('shotsOnTarget', '0')}<br>
+                    {a_stats.get('totalShots', '0')}<br>
+                    {a_stats.get('wonCorners', '0')}<br>
+                    {fouls_a}<br>
+                    {cards_a}
+                </p>
+                """, unsafe_allow_html=True)
 
         st.divider()
 
