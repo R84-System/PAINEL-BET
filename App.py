@@ -1,6 +1,6 @@
 """
 Painel Inteligente de Futebol para Transmissões ao Vivo
-Estilo Profissional (Padrão Live TikTok) - Lendo direto dos Secrets
+Estilo Profissional (Padrão Live TikTok) - CHAVE DIRETO NO CÓDIGO
 """
 
 import streamlit as st
@@ -36,23 +36,16 @@ UI_THEME = {
 }
 
 # =====================================================================
-# BLOCO 2: CLIENTE DE API (INTEGRAÇÃO COM A API-SPORTS VIA SECRETS)
+# BLOCO 2: CLIENTE DE API (CHAVE INSERIDA DIRETAMENTE)
 # =====================================================================
 
 class FootballAPIClient:
     def __init__(self):
-        # Tenta buscar a chave de forma segura em diferentes níveis dos Secrets
-        key = ""
-        try:
-            if "API_FOOTBALL_KEY" in st.secrets:
-                key = st.secrets["API_FOOTBALL_KEY"]
-            elif "general" in st.secrets and "API_FOOTBALL_KEY" in st.secrets["general"]:
-                key = st.secrets["general"]["API_FOOTBALL_KEY"]
-        except Exception:
-            pass
-            
-        self.api_key = key.strip()
+        # A SUA CHAVE ESTÁ DIRETAMENTE AQUI (Garante que nunca vai falhar)
+        self.api_key = "c6c045752fef0a0759a2a47ec070dbdd064f9a61d55c52fd1d59a052612f1da0"
         self.base_url = "https://v3.football.api-sports.io"
+        
+        # CABEÇALHO OFICIAL DA API-SPORTS
         self.headers = {
             "x-apisports-key": self.api_key
         }
@@ -67,9 +60,6 @@ class FootballAPIClient:
         return year
 
     def get_fixtures_by_date(self, league_id: int, date_str: str) -> tuple:
-        if not self.api_key:
-            return [], "Chave 'API_FOOTBALL_KEY' não foi encontrada ou está vazia nos Secrets do Streamlit."
-        
         season = self._get_active_season(league_id)
         try:
             url = f"{self.base_url}/fixtures?league={league_id}&season={season}&date={date_str}"
@@ -88,8 +78,6 @@ class FootballAPIClient:
             return [], f"Erro de conexão: {str(e)}"
 
     def get_fixture_statistics(self, fixture_id: int) -> list:
-        if not self.api_key:
-            return []
         try:
             url = f"{self.base_url}/fixtures/statistics?fixture={fixture_id}"
             response = requests.get(url, headers=self.headers, timeout=10)
@@ -98,7 +86,6 @@ class FootballAPIClient:
             return []
         except requests.exceptions.RequestException:
             return []
-
 
 # =====================================================================
 # BLOCO 3: MOTOR ANALÍTICO E CRONÔMETRO DIGITAL ESTILO LIVE
@@ -149,7 +136,6 @@ class MatchAnalyticsEngine:
 
     @staticmethod
     def get_match_timer_info(match_date_str: str) -> tuple:
-        """Retorna o cronômetro em formato HH:MM:SS e o horário local da partida."""
         try:
             match_time = datetime.fromisoformat(match_date_str.replace("Z", "+00:00"))
             local_time_str = match_time.astimezone().strftime("%H:%M")
@@ -242,7 +228,7 @@ def render_sidebar_admin():
             st.info("Insira a senha 'admin123' para alternar as ligas.")
 
 # =====================================================================
-# BLOCO 5: CONTROLADOR PRINCIPAL DA APLICAÇÃO (ATUALIZAÇÃO A CADA 1S)
+# BLOCO 5: CONTROLADOR PRINCIPAL DA APLICAÇÃO
 # =====================================================================
 
 configure_page_styles()
