@@ -41,7 +41,17 @@ UI_THEME = {
 
 class FootballAPIClient:
     def __init__(self):
-        self.api_key = st.secrets.get("API_FOOTBALL_KEY", "")
+        # Tenta buscar a chave de forma segura em diferentes níveis dos Secrets
+        key = ""
+        try:
+            if "API_FOOTBALL_KEY" in st.secrets:
+                key = st.secrets["API_FOOTBALL_KEY"]
+            elif "general" in st.secrets and "API_FOOTBALL_KEY" in st.secrets["general"]:
+                key = st.secrets["general"]["API_FOOTBALL_KEY"]
+        except Exception:
+            pass
+            
+        self.api_key = key.strip()
         self.base_url = "https://v3.football.api-sports.io"
         self.headers = {
             "x-apisports-key": self.api_key
@@ -58,7 +68,7 @@ class FootballAPIClient:
 
     def get_fixtures_by_date(self, league_id: int, date_str: str) -> tuple:
         if not self.api_key:
-            return [], "Chave 'API_FOOTBALL_KEY' não encontrada nos Secrets do Streamlit."
+            return [], "Chave 'API_FOOTBALL_KEY' não foi encontrada ou está vazia nos Secrets do Streamlit."
         
         season = self._get_active_season(league_id)
         try:
@@ -88,6 +98,7 @@ class FootballAPIClient:
             return []
         except requests.exceptions.RequestException:
             return []
+
 
 # =====================================================================
 # BLOCO 3: MOTOR ANALÍTICO E CRONÔMETRO DIGITAL ESTILO LIVE
