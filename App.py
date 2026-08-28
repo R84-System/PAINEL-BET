@@ -7,7 +7,7 @@ st.set_page_config(
     page_title="Painel Pro de Futebol", page_icon="⚽", layout="wide"
 )
 
-# CSS avançado para o Ticker em fundo branco clarinho, nomes em amarelo e placar em preto
+# CSS avançado para animações, piscar o placar ao sair gol, LED bar e ticker sem fundo branco
 st.markdown(
     """
 <style>
@@ -25,6 +25,17 @@ st.markdown(
     animation: blink 2s infinite ease-in-out;
     margin-right: 6px;
     box-shadow: 0 0 8px #22c55e;
+}
+@keyframes goalFlash {
+    0% { background-color: #22c55e; transform: scale(1.1); color: #000; }
+    50% { background-color: #facc15; transform: scale(1.15); color: #000; }
+    100% { background-color: transparent; transform: scale(1); color: inherit; }
+}
+.goal-alert {
+    animation: goalFlash 1.5s ease-in-out;
+    border-radius: 6px;
+    padding: 2px 8px;
+    display: inline-block;
 }
 @keyframes ledScan {
     0% { left: -50%; }
@@ -90,11 +101,11 @@ LEAGUES = {
 }
 
 
-@st.cache_data(ttl=10)
+@st.cache_data(ttl=3)
 def fetch_espn_matches(slug):
   url = f"https://site.api.espn.com/apis/site/v2/sports/soccer/{slug}/scoreboard"
   try:
-    res = requests.get(url, timeout=6)
+    res = requests.get(url, timeout=4)
     if res.status_code == 200:
       return res.json().get("events", [])
     return []
@@ -102,11 +113,11 @@ def fetch_espn_matches(slug):
     return []
 
 
-@st.cache_data(ttl=10)
+@st.cache_data(ttl=3)
 def fetch_match_summary(slug, event_id):
   url = f"https://site.api.espn.com/apis/site/v2/sports/soccer/{slug}/summary?event={event_id}"
   try:
-    res = requests.get(url, timeout=6)
+    res = requests.get(url, timeout=4)
     if res.status_code == 200:
       return res.json()
     return {}
@@ -115,7 +126,6 @@ def fetch_match_summary(slug, event_id):
 
 
 def format_datetime_brasilia(date_str):
-  """Converte para o fuso de Brasília (America/Sao_Paulo), retornando Dia da Semana, Data DD/MM e Horário AM/PM."""
   if not date_str:
     return "Em breve"
   try:
@@ -132,19 +142,15 @@ def format_datetime_brasilia(date_str):
         "Saturday": "Sábado",
         "Sunday": "Domingo",
     }
-    dia_eng = dt_br.strftime("%A")
-    dia_pt = dias_semana.get(dia_eng, dia_eng)
-
-    data_formatada = dt_br.strftime("%d/%m")
-    horario_am_pm = dt_br.strftime("%I:%M %p")
-
-    return f"{dia_pt}, {data_formatada} às {horario_am_pm}"
+    dia_pt = dias_semana.get(dt_br.strftime("%A"), dt_br.strftime("%A"))
+    return (
+        f"{dia_pt}, {dt_br.strftime('%d/%m')} às {dt_br.strftime('%I:%M %p')}"
+    )
   except Exception:
     return "Horário a confirmar"
 
 
 def extract_venue(event):
-  """Extrai o nome do estádio e local da partida."""
   try:
     competition = event.get("competitions", [{}])[0]
     venue = competition.get("venue", {})
@@ -178,8 +184,7 @@ def extract_stats(summary_data):
 
 
 def extract_red_cards(summary_data, home_team_id, away_team_id):
-  home_players = []
-  away_players = []
+  home_players, away_players = [], []
   details = summary_data.get("details", [])
   for item in details:
     text = str(item.get("type", {}).get("text", "")).lower()
@@ -194,6 +199,28 @@ def extract_red_cards(summary_data, home_team_id, away_team_id):
         if p_name not in away_players:
           away_players.append(p_name)
   return home_players, away_players
+
+
+def extract_goals(summary_data):
+  """Extrai os autores dos gols, tempo e time a partir do sumário da partida."""
+  goals_list = []
+  details = summary_data.get("details", [])
+  for item in details:
+    text = str(item.get("type", {}).get("text", "")).lower()
+    if "goal" in text or "gol" in text:
+      athlete = item.get("athlete", {})
+      scorer = athlete.get("displayName", "Gol")
+      clock = item.get("clock", {}).get("displayValue", "")
+      team = item.get("team", {}).get("displayName", "")
+      is_own_goal = (
+          "own goal" in text or "contra" in text or "gol contra" in text
+      )
+      goals_list.append({
+          "scorer": f"{scorer} (Contra)" if is_own_goal else scorer,
+          "clock": clock,
+          "team": team,
+      })
+  return goals_list
 
 
 def calculate_pressure(home_stats, away_stats):
@@ -246,7 +273,7 @@ def get_custom_bar(percentage, side):
 
 
 def render_live_ticker():
-  """Ticker ao vivo no topo com fundo branco clarinho, nomes em amarelo e placar em preto."""
+  """Ticker ao vivo sem fundo branco (fundo transparente/dark), nomes em amarelo e placar em destaque."""
   ticker_matches = []
   for l_name, l_slug in LEAGUES.items():
     if l_slug == "all_live":
@@ -272,12 +299,11 @@ def render_live_ticker():
             )
             a_score = c.get("score", "0")
         clock = comp.get("status", {}).get("displayClock", "")
-        # Nomes em amarelo escuro/destacado visível no branco (#b45309 ou #ca8a04) e placar em preto (#000000)
         item_html = (
-            f"⚽ <span style='color: #b45309; font-weight: 900;'>{h_team}</span>"
-            f" &nbsp;<span style='color: #000000; background-color: #e2e8f0; padding:"
+            f"⚽ <span style='color: #facc15; font-weight: 900;'>{h_team}</span>"
+            f" &nbsp;<span style='color: #000000; background-color: #f8fafc; padding:"
             f" 2px 6px; border-radius: 4px;'><b>{h_score} x {a_score}</b></span>"
-            f"&nbsp; <span style='color: #b45309; font-weight:"
+            f"&nbsp; <span style='color: #facc15; font-weight:"
             f" 900;'>{a_team}</span> &nbsp;({clock})"
         )
         ticker_matches.append(item_html)
@@ -286,9 +312,9 @@ def render_live_ticker():
     content = " &nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp; ".join(ticker_matches)
     st.markdown(
         f"""
-        <div style="background-color: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1; margin-bottom: 15px;">
-            <div style="font-size: 11px; color: #16a34a; font-weight: bold; margin-bottom: 4px;">🟢 TICKER AO VIVO (GLOBAL) - PLACAR EM TEMPO REAL</div>
-            <marquee behavior="scroll" direction="left" scrollamount="4" style="color: #0f172a; font-weight: bold; font-size: 14px;">
+        <div style="background-color: transparent; padding: 8px 0px; border-bottom: 1px solid #334155; margin-bottom: 15px;">
+            <div style="font-size: 11px; color: #22c55e; font-weight: bold; margin-bottom: 4px;">🟢 TICKER AO VIVO (GLOBAL) - PLACAR EM TEMPO REAL</div>
+            <marquee behavior="scroll" direction="left" scrollamount="4" style="color: #ffffff; font-weight: bold; font-size: 14px;">
                 {content}
             </marquee>
         </div>
@@ -297,7 +323,7 @@ def render_live_ticker():
     )
 
 
-# --- O TICKER APARECE ACIMA DE TUDO, EM QUALQUER TELA ---
+# --- RENDERIZA O TICKER NO TOPO ---
 render_live_ticker()
 
 st.title("⚽ Painel Pro de Futebol ao Vivo")
@@ -314,8 +340,12 @@ search_query = st.text_input(
     "🔍 Buscar time (ex: Flamengo, Real Madrid, Al Nassr...)", ""
 ).strip().lower()
 
+# Inicializa o cache de placares na sessão para detectar gols
+if "previous_scores" not in st.session_state:
+  st.session_state.previous_scores = {}
 
-@st.fragment(run_every=10)
+
+@st.fragment(run_every=2)
 def render_live_panel(slug, league_name, query):
   matches_to_display = []
 
@@ -366,12 +396,22 @@ def render_live_panel(slug, league_name, query):
         away_team_id = comp.get("team", {}).get("id", "")
         away_score = comp.get("score", "0")
 
+    # Detecção de Gol para Alerta Visual
+    match_key = f"{event_id}"
+    score_key = f"{home_score}-{away_score}"
+    is_goal_alert = False
+
+    if match_key in st.session_state.previous_scores:
+      old_score = st.session_state.previous_scores[match_key]
+      if old_score != score_key:
+        is_goal_alert = True
+    st.session_state.previous_scores[match_key] = score_key
+
     status_type = competition.get("status", {}).get("type", {})
     state = status_type.get("state", "pre")
     raw_detail = status_type.get("detail", "")
     event_date = event.get("date", "")
 
-    # Horário formatado em Brasília (Dia da semana, Data DD/MM e Horário AM/PM)
     formatted_kickoff = format_datetime_brasilia(event_date)
     venue_name = extract_venue(event)
 
@@ -384,6 +424,7 @@ def render_live_panel(slug, league_name, query):
     h_red_players, a_red_players = extract_red_cards(
         summary, home_team_id, away_team_id
     )
+    match_goals = extract_goals(summary)
 
     h_press, a_press = calculate_pressure(stats["home"], stats["away"])
 
@@ -437,17 +478,35 @@ def render_live_panel(slug, league_name, query):
         clock_display = (
             f" ({display_clock})" if display_clock else f" ({raw_detail})"
         )
+
+        score_html_class = "goal-alert" if is_goal_alert else ""
+
         st.markdown(
             f"""
                 <div style='text-align: center;'>
                     <span style='background-color:#1e293b; color:white; padding:4px 10px; border-radius:6px; font-size:11px; font-weight:bold; border: 1px solid #334155;'>
                         <span class="blinking-dot"></span>AO VIVO • {period_name}{clock_display}
                     </span>
-                    <h2 style='color:#fff; margin:6px 0;'>{home_score} x {away_score}</h2>
+                    <div style='margin:6px 0;'><h2 class='{score_html_class}' style='color:#fff; margin:0; display:inline-block;'>{home_score} x {away_score}</h2></div>
                 </div>
                 """,
             unsafe_allow_html=True,
         )
+
+        # Exibição dos autores dos gols logo abaixo do placar ao vivo
+        if match_goals:
+          goals_html = " | ".join([
+              f"⚽ <b>{g['scorer']}</b> ({g['clock']}')" for g in match_goals
+          ])
+          st.markdown(
+              f"""
+                    <div style='text-align: center; font-size: 11px; color: #facc15; margin-top: 4px; background: rgba(250, 204, 21, 0.1); padding: 3px; border-radius: 4px;'>
+                        <b>Gols:</b> {goals_html}
+                    </div>
+                    """,
+              unsafe_allow_html=True,
+          )
+
       elif state == "post":
         st.markdown(
             f"""
@@ -458,6 +517,18 @@ def render_live_panel(slug, league_name, query):
                 """,
             unsafe_allow_html=True,
         )
+        if match_goals:
+          goals_html = " | ".join([
+              f"⚽ <b>{g['scorer']}</b> ({g['clock']}')" for g in match_goals
+          ])
+          st.markdown(
+              f"""
+                    <div style='text-align: center; font-size: 11px; color: #facc15; margin-top: 4px;'>
+                        <b>Gols:</b> {goals_html}
+                    </div>
+                    """,
+              unsafe_allow_html=True,
+          )
       else:
         st.markdown(
             f"""
