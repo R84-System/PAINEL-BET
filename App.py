@@ -1,6 +1,6 @@
 """
 Painel Inteligente de Futebol para Transmissões ao Vivo
-Cobertura Global de Ligas - Arquitetura Modular Sênior
+Estilo Profissional (Padrão Live TikTok) - Arquitetura Sênior
 """
 
 import streamlit as st
@@ -28,12 +28,11 @@ LEAGUES = {
 }
 
 UI_THEME = {
-    "bg_color": "#0e1117",
-    "card_bg": "#16192b",
-    "text_primary": "#ffffff",
-    "accent_live": "#ff4b4b",
-    "accent_home": "#3b82f6",
-    "accent_away": "#ef4444",
+    "bg_color": "#090d16",
+    "card_bg": "#121726",
+    "border_color": "#1e2538",
+    "accent_live": "#ff3b3b",
+    "accent_timer": "#00ffcc",
 }
 
 # =====================================================================
@@ -74,7 +73,7 @@ class FootballAPIClient:
             return []
 
 # =====================================================================
-# BLOCO 3: MOTOR ANALÍTICO E CRONÔMETRO REVERSO INTELIGENTE
+# BLOCO 3: MOTOR ANALÍTICO E CRONÔMETRO DIGITAL ESTILO LIVE
 # =====================================================================
 
 class MatchAnalyticsEngine:
@@ -121,37 +120,37 @@ class MatchAnalyticsEngine:
             return {"home_pct": 50, "away_pct": 50, "status": "Equilibrado ⚖️", "trend": "Indisponível"}
 
     @staticmethod
-    def format_countdown(match_date_str: str) -> str:
+    def get_match_timer_info(match_date_str: str) -> tuple:
+        """Retorna o cronômetro em formato HH:MM:SS e o horário local da partida."""
         try:
             match_time = datetime.fromisoformat(match_date_str.replace("Z", "+00:00"))
+            local_time_str = match_time.strftime("%H:%M")
+            
             now = datetime.now(timezone.utc)
             diff = match_time - now
             total_seconds = int(diff.total_seconds())
             
             if total_seconds <= 0:
-                return "Iniciando..."
-            
-            # Se faltar menos de 1 hora (3600 segundos), ativa o cronômetro reverso detalhado
-            if total_seconds <= 3600:
-                minutes = total_seconds // 60
-                seconds = total_seconds % 60
-                return f"⚠️ Começa em {minutes:02d}m {seconds:02d}s"
+                return "EM BREVE", local_time_str
             
             hours = total_seconds // 3600
-            rem_mins = (total_seconds % 3600) // 60
-            return f"Inicia em {hours}h {rem_mins}m"
+            minutes = (total_seconds % 3600) // 60
+            seconds = total_seconds % 60
+            
+            timer_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+            return timer_str, local_time_str
         except Exception:
-            return "Pré-jogo"
+            return "--:--:--", "00:00"
 
 # =====================================================================
-# BLOCO 4: DESIGN DE INTERFACE E ESTILOS CSS
+# BLOCO 4: DESIGN DE INTERFACE E ESTILOS VISUAIS (TEMA LIVE)
 # =====================================================================
 
 def configure_page_styles():
     st.set_page_config(
-        page_title="Central Inteligente de Partidas",
+        page_title="Painel de Partidas - Live",
         page_icon="⚽",
-        layout="wide",
+        layout="centered",
         initial_sidebar_state="collapsed"
     )
     st.markdown(
@@ -160,30 +159,38 @@ def configure_page_styles():
         .stApp {{ background-color: {UI_THEME['bg_color']}; }}
         .match-card {{
             background-color: {UI_THEME['card_bg']};
-            border-radius: 12px;
-            padding: 16px;
-            margin-bottom: 14px;
-            border: 1px solid #252a41;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            border-radius: 14px;
+            padding: 14px 18px;
+            margin-bottom: 12px;
+            border: 1px solid {UI_THEME['border_color']};
+            box-shadow: 0 6px 16px rgba(0,0,0,0.4);
         }}
         .live-badge {{
             background-color: {UI_THEME['accent_live']};
-            color: white; padding: 4px 10px; border-radius: 4px;
-            font-size: 11px; font-weight: 700;
+            color: white; padding: 3px 8px; border-radius: 4px;
+            font-size: 10px; font-weight: 800; letter-spacing: 0.5px;
         }}
-        .pre-badge {{
-            background-color: #3b82f6;
-            color: white; padding: 4px 10px; border-radius: 4px;
-            font-size: 11px; font-weight: 700;
+        .timer-digital {{
+            font-family: monospace;
+            font-size: 20px;
+            font-weight: bold;
+            color: {UI_THEME['accent_timer']};
+            letter-spacing: 1px;
+            margin: 0;
+        }}
+        .time-label {{
+            font-size: 11px;
+            color: #8b9bb4;
+            margin-top: -2px;
         }}
         .thermometer-box {{
-            margin-top: 12px; background-color: #121522;
-            padding: 10px 14px; border-radius: 8px; border: 1px solid #22273d;
+            margin-top: 10px; background-color: #0b0f19;
+            padding: 8px 12px; border-radius: 8px; border: 1px solid #1a2236;
         }}
         .progress-bar-bg {{
-            background-color: #2a2f45; border-radius: 4px;
-            overflow: hidden; height: 10px; display: flex; width: 100%;
-            margin-top: 6px; margin-bottom: 6px;
+            background-color: #1e2538; border-radius: 4px;
+            overflow: hidden; height: 8px; display: flex; width: 100%;
+            margin-top: 5px; margin-bottom: 5px;
         }}
         </style>
         """,
@@ -204,10 +211,10 @@ def render_sidebar_admin():
             selected_name = st.selectbox("Campeonato Mundial", options=list(LEAGUES.keys()))
             st.session_state.selected_league = LEAGUES[selected_name]
         else:
-            st.info("Insira a senha 'admin123' para alternar as ligas mundiais.")
+            st.info("Insira a senha 'admin123' para alternar as ligas.")
 
 # =====================================================================
-# BLOCO 5: CONTROLADOR PRINCIPAL DA APLICAÇÃO
+# BLOCO 5: CONTROLADOR PRINCIPAL DA APLICAÇÃO (ATUALIZAÇÃO A CADA 1S)
 # =====================================================================
 
 configure_page_styles()
@@ -222,16 +229,16 @@ analytics = MatchAnalyticsEngine()
 
 render_sidebar_admin()
 
-st.title("⚽ Painel Inteligente de Partidas (Global)")
+st.markdown("<h2 style='text-align: center; color: white; margin-bottom: 20px;'>⚽ Painel de Transmissão</h2>", unsafe_allow_html=True)
 
-@st.fragment(run_every="5s")
+@st.fragment(run_every="1s")
 def render_live_dashboard():
     league_id = st.session_state.selected_league
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     matches = api_client.get_fixtures_by_date(league_id, today_str)
     
     if not matches:
-        st.info("Nenhuma partida agendada para hoje nesta liga. O painel exibirá os confrontos assim que houverem novas rodadas.")
+        st.info("Nenhuma partida agendada para hoje nesta liga.")
         return
 
     for match in matches:
@@ -247,26 +254,42 @@ def render_live_dashboard():
         
         home_team = teams.get("home", {}).get("name", "Casa")
         away_team = teams.get("away", {}).get("name", "Fora")
+        home_logo = teams.get("home", {}).get("logo", "")
+        away_logo = teams.get("away", {}).get("logo", "")
+        
         home_goals = goals.get("home") if goals.get("home") is not None else 0
         away_goals = goals.get("away") if goals.get("away") is not None else 0
         
         with st.container():
             st.markdown("<div class='match-card'>", unsafe_allow_html=True)
             
-            col1, col2, col3 = st.columns([3, 2, 3])
-            with col1:
-                st.markdown(f"<h3 style='text-align: right; margin: 0; color: #fff;'>{home_team}</h3>", unsafe_allow_html=True)
-            with col2:
+            col_home, col_center, col_away = st.columns([3, 3, 3])
+            
+            with col_home:
+                c_logo, c_name = st.columns([1, 2])
+                with c_logo:
+                    if home_logo:
+                        st.image(home_logo, width=32)
+                with c_name:
+                    st.markdown(f"<div style='color: white; font-weight: 700; font-size: 13px; line-height: 1.2;'>{home_team}</div>", unsafe_allow_html=True)
+            
+            with col_center:
                 if status_short in ["1H", "2H", "ET"]:
                     time_str = f"{elapsed}'" + (f"+{extra}'" if extra else "")
-                    st.markdown(f"<div style='text-align: center;'><span class='live-badge'>AO VIVO {time_str}</span><h2 style='margin: 4px 0 0 0; color: #fff;'>{home_goals} x {away_goals}</h2></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='text-align: center;'><span class='live-badge'>AO VIVO {time_str}</span><div style='color: white; font-weight: bold; font-size: 18px; margin-top: 2px;'>{home_goals} x {away_goals}</div></div>", unsafe_allow_html=True)
                 elif status_short == "NS":
-                    countdown = analytics.format_countdown(match_date)
-                    st.markdown(f"<div style='text-align: center;'><span class='pre-badge'>{countdown}</span><h3 style='margin: 4px 0 0 0; color: #94a3b8;'>vs</h3></div>", unsafe_allow_html=True)
+                    timer_str, local_time = analytics.get_match_timer_info(match_date)
+                    st.markdown(f"<div style='text-align: center;'><p class='timer-digital'>{timer_str}</p><p class='time-label'>{local_time}</p></div>", unsafe_allow_html=True)
                 else:
-                    st.markdown(f"<div style='text-align: center;'><span style='color: #94a3b8; font-weight: bold;'>ENCERRADO</span><h2 style='margin: 4px 0 0 0; color: #fff;'>{home_goals} x {away_goals}</h2></div>", unsafe_allow_html=True)
-            with col3:
-                st.markdown(f"<h3 style='text-align: left; margin: 0; color: #fff;'>{away_team}</h3>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='text-align: center;'><span style='color: #8b9bb4; font-size: 11px; font-weight: bold;'>ENCERRADO</span><div style='color: white; font-weight: bold; font-size: 16px;'>{home_goals} x {away_goals}</div></div>", unsafe_allow_html=True)
+            
+            with col_away:
+                c_name, c_logo = st.columns([2, 1])
+                with c_name:
+                    st.markdown(f"<div style='text-align: right; color: white; font-weight: 700; font-size: 13px; line-height: 1.2;'>{away_team}</div>", unsafe_allow_html=True)
+                with c_logo:
+                    if away_logo:
+                        st.image(away_logo, width=32)
             
             if status_short in ["1H", "2H", "ET"]:
                 stats_data = api_client.get_fixture_statistics(fixture_id)
@@ -274,43 +297,17 @@ def render_live_dashboard():
                 
                 st.markdown(f"""
                 <div class='thermometer-box'>
-                    <div style='display: flex; justify-content: space-between; font-size: 12px; font-weight: bold;'>
+                    <div style='display: flex; justify-content: space-between; font-size: 11px; font-weight: bold;'>
                         <span style='color: #3b82f6;'>{home_team} ({thermometer['home_pct']}%)</span>
-                        <span style='color: #f87171;'>{thermometer['status']}</span>
+                        <span style='color: #ff7676;'>{thermometer['status']}</span>
                         <span style='color: #ef4444;'>({thermometer['away_pct']}%) {away_team}</span>
                     </div>
                     <div class='progress-bar-bg'>
                         <div style='width: {thermometer['home_pct']}%; background-color: #3b82f6; height: 100%;'></div>
                         <div style='width: {thermometer['away_pct']}%; background-color: #ef4444; height: 100%;'></div>
                     </div>
-                    <div style='text-align: center; font-size: 12px; color: #38bdf8; font-weight: 600;'>
-                        Tendência: {thermometer['trend']}
-                    </div>
                 </div>
                 """, unsafe_allow_html=True)
-            
-            with st.expander("📊 Estatísticas Detalhadas da Partida"):
-                stats_data = api_client.get_fixture_statistics(fixture_id)
-                if stats_data and len(stats_data) >= 2:
-                    h_stats = {s["type"]: s["value"] for s in stats_data[0].get("statistics", [])}
-                    a_stats = {s["type"]: s["value"] for s in stats_data[1].get("statistics", [])}
-                    
-                    metrics = [
-                        ("Ball Possession", "Posse de Bola"),
-                        ("Shots on Goal", "Chutes ao Gol"),
-                        ("Total Shots", "Total de Finalizações"),
-                        ("Corner Kicks", "Escanteios"),
-                        ("Yellow Cards", "Cartões Amarelos"),
-                        ("Fouls", "Faltas")
-                    ]
-                    
-                    for key, label in metrics:
-                        c1, c2, c3 = st.columns([2, 2, 2])
-                        with c1: st.markdown(f"<div style='text-align: right; font-weight: bold;'>{h_stats.get(key, 0)}</div>", unsafe_allow_html=True)
-                        with c2: st.markdown(f"<div style='text-align: center; color: #94a3b8; font-size: 13px;'>{label}</div>", unsafe_allow_html=True)
-                        with c3: st.markdown(f"<div style='text-align: left; font-weight: bold;'>{a_stats.get(key, 0)}</div>", unsafe_allow_html=True)
-                else:
-                    st.info("Estatísticas detalhadas indisponíveis no momento.")
             
             st.markdown("</div>", unsafe_allow_html=True)
 
