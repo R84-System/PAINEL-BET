@@ -46,7 +46,8 @@ def fetch_events(lid):
         "APIkey": API_KEY
     }
     try:
-        res = requests.get(BASE_URL, params=params, timeout=10)
+        # Timeout aumentado para 25 segundos para evitar quedas por lentidão do servidor
+        res = requests.get(BASE_URL, params=params, timeout=25)
         if res.status_code == 200:
             data = res.json()
             if isinstance(data, list):
@@ -54,17 +55,19 @@ def fetch_events(lid):
             elif isinstance(data, dict):
                 return [], data.get("error", "Erro desconhecido na API")
         return [], f"Erro HTTP {res.status_code}"
+    except requests.exceptions.Timeout:
+        return [], "O servidor demorou muito para responder (Timeout). Tente atualizar a página."
     except Exception as e:
         return [], str(e)
 
 matches, api_error = fetch_events(league_id)
 
 if api_error:
-    st.error(f"⚠️ Erro ao comunicar com a API: {api_error}")
+    st.error(f"⚠️ {api_error}")
 
-if not matches:
+if not matches and not api_error:
     st.info("Nenhuma partida programada para hoje nesta liga.")
-else:
+elif matches:
     st.success(f"{len(matches)} partida(s) encontrada(s) para hoje!")
     
     for m in matches:
