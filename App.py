@@ -7,7 +7,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# Inserção de CSS para a bolinha verde piscando
+# CSS com a bolinha verde piscando mais devagar (2 segundos)
 st.markdown("""
 <style>
 @keyframes blink {
@@ -21,7 +21,7 @@ st.markdown("""
     background-color: #22c55e;
     border-radius: 50%;
     display: inline-block;
-    animation: blink 1s infinite ease-in-out;
+    animation: blink 2s infinite ease-in-out;
     margin-right: 6px;
     box-shadow: 0 0 8px #22c55e;
 }
@@ -120,20 +120,19 @@ def calculate_pressure(home_stats, away_stats):
     return h_pct, 100 - h_pct
 
 def get_custom_bar(percentage, side):
-    if percentage >= 70:
-        color, label = "#ef4444", "🔥 Pressão Alta"
-    elif percentage >= 50:
-        color, label = "#f97316", "⚡ Força Moderada"
-    elif percentage >= 30:
-        color, label = "#3b82f6", "⚖️ Neutro"
+    # Cores atualizadas: Alta = Verde, Neutro = Branco, Baixa/Defensiva = Vermelho
+    if percentage >= 65:
+        color, label = "#22c55e", "🔥 Pressão Alta"
+    elif percentage >= 35:
+        color, label = "#ffffff", "⚖️ Neutro"
     else:
-        color, label = "#64748b", "🛡️ Defensivo"
+        color, label = "#ef4444", "🛡️ Defensiva / Baixa"
         
     align = "right" if side == "home" else "left"
     
     return f"""
     <div style="text-align: {align}; margin-top: 6px;">
-        <span style="font-size: 11px; color: #cbd5e1; font-weight: bold;">{label} ({percentage}%)</span>
+        <span style="font-size: 11px; color: {color}; font-weight: bold;">{label} ({percentage}%)</span>
         <div style="background-color: #334155; border-radius: 4px; width: 100%; height: 10px; overflow: hidden; margin-top: 3px;">
             <div style="background-color: {color}; width: {percentage}%; height: 100%; border-radius: 4px;"></div>
         </div>
@@ -213,7 +212,6 @@ def render_live_panel(slug, league_name, query):
         if query or slug == "all_live":
             st.caption(f"🏆 Campeonato: **{l_name}**")
 
-        # Indicadores de Cartão Vermelho acima dos nomes dos times
         h_red_badge = f"<div style='text-align: right; margin-bottom: 2px;'><span style='background-color: #ef4444; color: white; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: bold;'>🟥 EXPULSO ({len(h_red_players)})</span></div>" if h_red_players else ""
         a_red_badge = f"<div style='text-align: left; margin-bottom: 2px;'><span style='background-color: #ef4444; color: white; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: bold;'>🟥 EXPULSO ({len(a_red_players)})</span></div>" if a_red_players else ""
 
@@ -268,7 +266,6 @@ def render_live_panel(slug, league_name, query):
         with st.expander(f"📊 Ver Estatísticas Detalhadas ({home_team} vs {away_team})"):
             h_stats, a_stats = stats["home"], stats["away"]
             
-            # Formatação Posse de Bola com %
             poss_h = h_stats.get("possessionPct", "0")
             if not poss_h.endswith("%"):
                 poss_h = f"{poss_h}%" if poss_h != "0" else "0%"
@@ -276,14 +273,13 @@ def render_live_panel(slug, league_name, query):
             if not poss_a.endswith("%"):
                 poss_a = f"{poss_a}%" if poss_a != "0" else "0%"
 
-            # Faltas e Cartões
             fouls_h = h_stats.get("foulsCommitted", h_stats.get("fouls", "0"))
             fouls_a = a_stats.get("foulsCommitted", a_stats.get("fouls", "0"))
             
             yellow_h = h_stats.get("yellowCards", "0")
             yellow_a = a_stats.get("yellowCards", "0")
             red_h_count = h_stats.get("redCards", str(len(h_red_players)))
-            red_a_count = a_stats.get("redCards", str(len(a_red_players)))
+            red_a_count = h_stats.get("redCards", str(len(a_red_players)))
 
             cards_h_str = f"🟨 {yellow_h} | 🟥 {red_h_count}"
             cards_a_str = f"🟨 {yellow_a} | 🟥 {red_a_count}"
