@@ -175,7 +175,7 @@ dashboard_html = """
             transition: width 0.5s ease;
         }
         .controls {
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             display: flex;
             gap: 15px;
             flex-wrap: wrap;
@@ -202,7 +202,7 @@ dashboard_html = """
             padding: 8px 12px;
             border-radius: 8px;
             border: 1px solid #334155;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             overflow: hidden;
         }
         .ticker-title {
@@ -254,6 +254,17 @@ dashboard_html = """
 </head>
 <body>
 
+    <h2 style="margin-top:0; margin-bottom:12px; display:flex; align-items:center; gap:10px;">
+        ⚽ Painel Pro de Futebol ao Vivo
+    </h2>
+
+    <div class="ticker-bar" id="tickerContainer" style="display:none;">
+        <div class="ticker-title">🟢 TICKER AO VIVO (GLOBAL) - PLACAR EM TEMPO REAL</div>
+        <div class="ticker-wrap">
+            <div class="ticker-move" id="tickerContent"></div>
+        </div>
+    </div>
+
     <div class="controls">
         <div>
             <label style="font-size:12px; color:#94a3b8; display:block; margin-bottom:4px;">Campeonato</label>
@@ -289,13 +300,6 @@ dashboard_html = """
         </div>
     </div>
 
-    <div class="ticker-bar" id="tickerContainer" style="display:none;">
-        <div class="ticker-title">🟢 TICKER AO VIVO (GLOBAL) - PLACAR EM TEMPO REAL</div>
-        <div class="ticker-wrap">
-            <div class="ticker-move" id="tickerContent"></div>
-        </div>
-    </div>
-
     <div id="mainContainer">Carregando partidas...</div>
 
     <script>
@@ -312,7 +316,7 @@ dashboard_html = """
 
         let previousScores = {};
         let summariesCache = {};
-        let openStates = {}; // Mantém o estado aberto das estatísticas entre os ciclos de atualização
+        let openStates = {};
 
         function formatDateBrasilia(dateStr) {
             if (!dateStr) return "Em breve";
@@ -336,25 +340,17 @@ dashboard_html = """
             return {};
         }
 
-        async function fetchAllData() {
-            let selectedLeague = document.getElementById('leagueSelect').value;
-            let searchQuery = document.getElementById('searchInput').value.toLowerCase().trim();
-            
-            let matchesToDisplay = [];
+        async function updateGlobalTicker() {
             let tickerMatches = [];
-            let leaguesToFetch = selectedLeague === 'all_live' ? Object.keys(LEAGUES) : [selectedLeague];
-
-            for (let lSlug of leaguesToFetch) {
+            for (let lSlug of Object.keys(LEAGUES)) {
                 try {
                     let res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard`);
                     if (!res.ok) continue;
                     let data = await res.json();
                     let events = data.events || [];
-
                     for (let ev of events) {
                         let comp = ev.competitions[0];
                         let state = comp.status.type.state;
-                        
                         if (state === 'in' || comp.status.type.name === 'STATUS_HALFTIME') {
                             let hTeam = "Casa", aTeam = "Fora", hScore = "0", aScore = "0";
                             for (let c of comp.competitors) {
@@ -369,27 +365,10 @@ dashboard_html = """
                             let clock = comp.status.displayClock || "";
                             tickerMatches.push(`⚽ <span style='color: #facc15; font-weight: 900;'>${hTeam}</span> &nbsp;<span style='color: #000000; background-color: #f8fafc; padding: 2px 6px; border-radius: 4px;'><b>${hScore} x ${aScore}</b></span>&nbsp; <span style='color: #facc15; font-weight: 900;'>${aTeam}</span> &nbsp;(${clock})`);
                         }
-
-                        let leagueName = LEAGUES[lSlug] || lSlug;
-                        if (searchQuery) {
-                            if (ev.name.toLowerCase().includes(searchQuery)) {
-                                matchesToDisplay.push({ leagueName, lSlug, event: ev });
-                            }
-                        } else if (selectedLeague === 'all_live') {
-                            if (state === 'in' || comp.status.type.name === 'STATUS_HALFTIME') matchesToDisplay.push({ leagueName, lSlug, event: ev });
-                        } else {
-                            matchesToDisplay.push({ leagueName, lSlug, event: ev });
-                        }
                     }
                 } catch(e) {}
             }
 
-            // Pré-carrega sumários para todas as partidas exibidas (para garantir gols e cartões imediatos)
-            for (let item of matchesToDisplay) {
-                await asyncizedFetchSummary(item.lSlug, item.event.id);
-            }
-
-            // Atualiza Ticker contínuo
             let tickerContainer = document.getElementById('tickerContainer');
             let tickerContent = document.getElementById('tickerContent');
             if (tickerMatches.length > 0) {
@@ -399,6 +378,47 @@ dashboard_html = """
             } else {
                 tickerContainer.style.display = "none";
             }
+        }
+
+        async function fetchAllData() {
+            let selectedLeague = document.getElementById('leagueSelect').value;
+            let searchQuery = document.getElementById('searchInput').value.toLowerCase().trim();
+            
+            let matchesToDisplay = [];
+            let leaguesToFetch = selectedLeague === 'all_live' ? Object.keys(LEAGUES) : [selectedLeague];
+
+            for (let lSlug of leaguesToFetch) {
+                try {
+                    let res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard`);
+                    if (!res.ok) continue;
+                    let data = await res.json();
+                    let events = data.events || [];
+
+                    for (let ev of events) {
+                        let comp = ev.competitions[0];
+                        let state = comp.status.type.state;
+                        let leagueName = LEAGUES[lSlug] || lSlug;
+
+                        if (searchQuery) {
+                            if (ev.name.toLowerCase().includes(searchQuery)) {
+                                matchesToDisplay.push({ leagueName, lSlug, event: ev });
+                            }
+                        } else if (selectedLeague === 'all_live') {
+                            if (state === 'in' || comp.status.type.name === 'STATUS_HALFTIME') {
+                                matchesToDisplay.push({ leagueName, lSlug, event: ev });
+                            }
+                        } else {
+                            matchesToDisplay.push({ leagueName, lSlug, event: ev });
+                        }
+                    }
+                } catch(e) {}
+            }
+
+            for (let item of matchesToDisplay) {
+                await asyncizedFetchSummary(item.lSlug, item.event.id);
+            }
+
+            updateGlobalTicker();
 
             let mainContainer = document.getElementById('mainContainer');
             if (matchesToDisplay.length === 0) {
@@ -449,7 +469,6 @@ dashboard_html = """
 
                 let summary = summariesCache[`${lSlug}_${eventId}`] || {};
                 
-                // Estatísticas e Pressão
                 let hStats = {}, aStats = {};
                 if (summary.boxscore && summary.boxscore.teams) {
                     for (let t of summary.boxscore.teams) {
@@ -481,7 +500,6 @@ dashboard_html = """
                 let getBarColor = (pct) => pct >= 65 ? "#22c55e" : (pct >= 35 ? "#ffffff" : "#ef4444");
                 let getBarLabel = (pct) => pct >= 65 ? "🔥 Pressão Alta" : (pct >= 35 ? "⚖️ Neutro" : "🛡️ Defensiva / Baixa");
 
-                // Extração de Cartões e Gols
                 let hYellowCount = 0, aYellowCount = 0;
                 let hRedCount = 0, aRedCount = 0;
                 let goalsHtmlList = [];
@@ -493,14 +511,29 @@ dashboard_html = """
                         let isHome = d.team && d.team.id === homeTeamId;
                         let isAway = d.team && d.team.id === awayTeamId;
 
-                        if (text.includes("yellow card") || text.includes("cartão amarelo") || typeName.includes("yellow")) {
+                        if (text.includes("yellow card") || text.includes("cartão amarelo") || typeName.includes("yellow") || typeName.includes("yellowcard")) {
                             if (isHome) hYellowCount++;
                             if (isAway) aYellowCount++;
                         }
-                        if (text.includes("red card") || text.includes("cartão vermelho") || typeName.includes("red")) {
+                        if (text.includes("red card") || text.includes("cartão vermelho") || typeName.includes("red") || typeName.includes("redcard")) {
                             if (isHome) hRedCount++;
                             if (isAway) aRedCount++;
                         }
+                    }
+                }
+
+                let scoringEvents = summary.scoringPlays || [];
+                if (scoringEvents.length > 0) {
+                    for (let sp of scoringEvents) {
+                        let scorer = (sp.athlete && sp.athlete.displayName) ? sp.athlete.displayName : "Gol";
+                        let clockVal = (sp.clock && sp.clock.displayValue) ? sp.clock.displayValue : "";
+                        let isOwn = (sp.type && sp.type.text && sp.type.text.toLowerCase().includes("own goal")) || false;
+                        goalsHtmlList.push(`⚽ <b>${scorer}${isOwn ? ' (Contra)' : ''}</b> (${clockVal}')`);
+                    }
+                } else if (summary.details) {
+                    for (let d of summary.details) {
+                        let text = (d.type && d.type.text) ? d.type.text.toLowerCase() : "";
+                        let typeName = (d.type && d.type.name) ? d.type.name.toLowerCase() : "";
                         if (text.includes("goal") || text.includes("gol") || typeName.includes("goal")) {
                             let scorer = (d.athlete && d.athlete.displayName) ? d.athlete.displayName : (d.athletesInvolved && d.athletesInvolved[0] ? d.athletesInvolved[0].displayName : "Gol");
                             let clockVal = (d.clock && d.clock.displayValue) ? d.clock.displayValue : "";
@@ -565,15 +598,14 @@ dashboard_html = """
 
                 let goalsHtml = goalsHtmlList.length > 0 ? `<div class="goals-container"><b>Gols:</b> ${goalsHtmlList.join(" | ")}</div>` : '';
 
-                // Verifica se este card estava aberto com base no cache persistente
                 let isOpen = openStates[eventId] ? 'open' : '';
                 let possH = hStats.possessionPct || "0%"; if(!possH.includes("%") && possH !== "0") possH += "%";
                 let possA = aStats.possessionPct || "0%"; if(!possA.includes("%") && possA !== "0") possA += "%";
 
                 let statsInnerHtml = `
-                    <p style='text-align: right;'><b>${possH}</b><br>${hStats.shotsOnTarget || '0'}<br>${hStats.totalShots || '0'}<br>${hStats.wonCorners || '0'}<br>${hStats.foulsCommitted || hStats.fouls || '0'}</p>
-                    <p style='text-align: center; color: #94a3b8;'>Posse de Bola<br>Chutes no Gol<br>Chutes Totais<br>Escanteios<br>Faltas Cometidas</p>
-                    <p style='text-align: left;'><b>${possA}</b><br>${aStats.shotsOnTarget || '0'}<br>${aStats.totalShots || '0'}<br>${aStats.wonCorners || '0'}<br>${aStats.foulsCommitted || aStats.fouls || '0'}</p>
+                    <p style='text-align: right;'><b>${possH}</b><br>${hStats.shotsOnTarget || '0'}<br>${hStats.totalShots || '0'}<br>${hStats.wonCorners || '0'}<br>${hStats.foulsCommitted || hStats.fouls || '0'}<br><span class="yellow-card">🟨 ${hYellowCount}</span><br><span class="red-card">🟥 ${hRedCount}</span></p>
+                    <p style='text-align: center; color: #94a3b8;'>Posse de Bola<br>Chutes no Gol<br>Chutes Totais<br>Escanteios<br>Faltas Cometidas<br>Cartões Amarelos<br>Cartões Vermelhos</p>
+                    <p style='text-align: left;'><b>${possA}</b><br>${aStats.shotsOnTarget || '0'}<br>${aStats.totalShots || '0'}<br>${aStats.wonCorners || '0'}<br>${aStats.foulsCommitted || aStats.fouls || '0'}<br><span class="yellow-card">🟨 ${aYellowCount}</span><br><span class="red-card">🟥 ${aRedCount}</span></p>
                 `;
 
                 html += `
