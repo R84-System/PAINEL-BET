@@ -7,7 +7,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# Mapeamento de ligas usando os slugs oficiais da ESPN
 LEAGUES = {
     "🇧🇷 Brasileirão Série A": "bra.1",
     "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League": "eng.1",
@@ -63,19 +62,18 @@ else:
                 away_score = comp.get("score", "0")
         
         status_type = competition.get("status", {}).get("type", {})
-        status_name = status_type.get("name", "")
+        state = status_type.get("state", "pre") # pre, in, post
         detail = status_type.get("detail", "")
         
         col1, col2, col3 = st.columns([3, 2, 3])
         with col1:
             st.markdown(f"<h3 style='text-align: right; color: #fff;'>{home_team}</h3>", unsafe_allow_html=True)
         with col2:
-            if "STATUS_IN_PROGRESS" in status_name or "LIVE" in status_name.upper():
+            if state == "in":
                 st.markdown(f"<div style='text-align: center;'><span style='background-color:#ff4b4b; color:white; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:bold;'>AO VIVO ({detail})</span><h2 style='color:#fff; margin:4px 0;'>{home_score} x {away_score}</h2></div>", unsafe_allow_html=True)
-            elif "STATUS_FINAL" in status_name:
+            elif state == "post":
                 st.markdown(f"<div style='text-align: center;'><span style='color:#94a3b8; font-weight:bold;'>ENCERRADO</span><h2 style='color:#fff; margin:4px 0;'>{home_score} x {away_score}</h2></div>", unsafe_allow_html=True)
             else:
-                # Jogo agendado (mostra o horário da partida)
                 st.markdown(f"<div style='text-align: center;'><span style='background-color:#3b82f6; color:white; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:bold;'>🕒 {detail}</span><h3 style='color:#94a3b8; margin:4px 0;'>vs</h3></div>", unsafe_allow_html=True)
         with col3:
             st.markdown(f"<h3 style='text-align: left; color: #fff;'>{away_team}</h3>", unsafe_allow_html=True)
