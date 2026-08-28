@@ -19,7 +19,12 @@ LEAGUES = {
     "🇩🇪 Bundesliga": "175",
     "🇫🇷 Ligue 1": "168",
     "🇵🇹 Primeira Liga": "332",
-    "🇪🇺 Champions League": "4"
+    "🇸🇦 Saudi Pro League": "468",
+    "🇦🇷 Liga Profesional (Argentina)": "37",
+    "🇳🇱 Eredivisie": "116",
+    "🇺🇸 MLS": "338",
+    "🇪🇺 Champions League": "4",
+    "🌎 Copa Libertadores": "15"
 }
 
 st.sidebar.title("⚙️ Configurações")
@@ -31,7 +36,6 @@ st.markdown(f"Liga selecionada: **{selected_league_name}**")
 
 @st.cache_data(ttl=30)
 def fetch_events(lid):
-    # Busca focada apenas no dia de hoje para evitar lentidão e timeouts
     today = datetime.now().strftime("%Y-%m-%d")
     
     params = {
@@ -70,7 +74,6 @@ else:
         a_goals = m.get("match_awayteam_score", "0")
         status = m.get("match_status", "")
         time_match = m.get("match_time", "")
-        date_match = m.get("match_date", "")
         
         col1, col2, col3 = st.columns([3, 2, 3])
         with col1:
@@ -81,7 +84,6 @@ else:
             elif status in ["FT", "Finished"]:
                 st.markdown(f"<div style='text-align: center;'><span style='color:#94a3b8; font-weight:bold;'>ENCERRADO</span><h2 style='color:#fff; margin:4px 0;'>{h_goals} x {a_goals}</h2></div>", unsafe_allow_html=True)
             else:
-                # Jogo ainda não começou (exibe o horário agendado)
                 st.markdown(f"<div style='text-align: center;'><span style='background-color:#3b82f6; color:white; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:bold;'>🕒 {time_match}</span><h3 style='color:#94a3b8; margin:4px 0;'>vs</h3></div>", unsafe_allow_html=True)
         with col3:
             st.markdown(f"<h3 style='text-align: left; color: #fff;'>{away}</h3>", unsafe_allow_html=True)
