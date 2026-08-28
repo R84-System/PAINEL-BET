@@ -11,7 +11,6 @@ st.set_page_config(
 API_KEY = "c6c045752fef0a0759a2447ec070dbdd064f9a61d55c52fd1d59a052612f1da0"
 BASE_URL = "https://apifootball.com/api/"
 
-# IDs padrão para o apifootball.com
 LEAGUES = {
     "🇧🇷 Brasileirão Série A": "271",
     "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League": "152",
@@ -32,9 +31,9 @@ st.markdown(f"Liga selecionada: **{selected_league_name}**")
 
 @st.cache_data(ttl=30)
 def fetch_events(lid):
-    today = datetime.now().strftime("%Y-%m-%d")
+    # Janela ampliada para garantir que pega os jogos de hoje e próximos dias
     from_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-    to_date = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+    to_date = (datetime.now() + timedelta(days=3)).strftime("%Y-%m-%d")
     
     params = {
         "action": "get_events",
@@ -44,20 +43,27 @@ def fetch_events(lid):
         "APIkey": API_KEY
     }
     try:
-        res = requests.get(BASE_URL, params=params, timeout=10)
+        res = requests.get(BASE_URL, params=params, timeout=15)
         if res.status_code == 200:
             data = res.json()
             if isinstance(data, list):
-                return data
-        return []
-    except:
-        return []
+                return data, None
+            elif isinstance(data, dict):
+                return [], data.get("error", "Erro desconhecido na API")
+        return [], f"Erro HTTP {res.status_code}"
+    except Exception as e:
+        return [], str(e)
 
-matches = fetch_events(league_id)
+matches, api_error = fetch_events(league_id)
+
+if api_error:
+    st.error(f"⚠️ Erro ao comunicar com a API: {api_error}")
 
 if not matches:
-    st.info("Nenhuma partida encontrada para esta liga no período atual.")
+    st.info("Nenhuma partida encontrada para esta liga no período atual. Verifique se há rodada hoje.")
 else:
+    st.success(f"{len(matches)} partida(s) encontrada(s)!")
+    
     for m in matches:
         home = m.get("match_hometeam_name", "Casa")
         away = m.get("match_awayteam_name", "Fora")
@@ -76,7 +82,8 @@ else:
             elif status in ["FT", "Finished"]:
                 st.markdown(f"<div style='text-align: center;'><span style='color:#94a3b8; font-weight:bold;'>ENCERRADO</span><h2 style='color:#fff; margin:4px 0;'>{h_goals} x {a_goals}</h2></div>", unsafe_allow_html=True)
             else:
-                st.markdown(f"<div style='text-align: center;'><span style='color:#3b82f6; font-weight:bold;'>{date_match} {time_match}</span><h3 style='color:#94a3b8; margin:4px 0;'>vs</h3></div>", unsafe_allow_html=True)
+                # Partida não iniciada (mostra a data e horário agendado)
+                st.markdown(f"<div style='text-align: center;'><span style='background-color:#3b82f6; color:white; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:bold;'>🕒 {date_match} {time_match}</span><h3 style='color:#94a3b8; margin:4px 0;'>vs</h3></div>", unsafe_allow_html=True)
         with col3:
             st.markdown(f"<h3 style='text-align: left; color: #fff;'>{away}</h3>", unsafe_allow_html=True)
         st.divider()
