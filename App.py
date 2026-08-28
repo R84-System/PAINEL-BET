@@ -1,10 +1,10 @@
 """
 Painel Inteligente de Futebol para Transmissões ao Vivo
-Versão com Inserção de Chave via Painel Lateral (Corrigido)
+Estilo Profissional (Padrão Live TikTok) - Arquitetura Sênior
 """
 
 import streamlit as st
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 import requests
 
 # =====================================================================
@@ -12,10 +12,10 @@ import requests
 # =====================================================================
 
 LEAGUES = {
-    "🇮🇹 Serie A (Itália)": 135,
     "🇧🇷 Brasileirão Série A": 71,
     "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League (Inglaterra)": 39,
     "🇪🇸 La Liga (Espanha)": 140,
+    "🇮🇹 Serie A (Itália)": 135,
     "🇩🇪 Bundesliga (Alemanha)": 78,
     "🇫🇷 Ligue 1 (França)": 61,
     "🇵🇹 Primeira Liga (Portugal)": 94,
@@ -36,46 +36,29 @@ UI_THEME = {
 }
 
 # =====================================================================
-# BLOCO 2: CLIENTE DE API COM SUPORTE A CHAVE DINÂMICA
+# BLOCO 2: CLIENTE DE API (INTEGRAÇÃO COM A API-FOOTBALL)
 # =====================================================================
 
 class FootballAPIClient:
-    def __init__(self, api_key: str):
-        self.api_key = api_key
+    def __init__(self):
+        self.api_key = st.secrets.get("API_FOOTBALL_KEY", "")
         self.base_url = "https://v3.football.api-sports.io"
         self.headers = {
-            "x-apisports-key": self.api_key
+            "x-rapidapi-key": self.api_key,
+            "x-rapidapi-host": "v3.football.api-sports.io"
         }
 
-    def _get_active_season(self, league_id: int) -> int:
-        now = datetime.now()
-        year = now.year
-        if league_id in [71, 128, 253]:
-            return year
-        if now.month < 7:
-            return year - 1
-        return year
-
-    def get_fixtures_by_date(self, league_id: int, date_str: str) -> tuple:
+    def get_fixtures_by_date(self, league_id: int, date_str: str) -> list:
         if not self.api_key:
-            return [], "Chave da API não informada."
-        
-        season = self._get_active_season(league_id)
+            return []
         try:
-            url = f"{self.base_url}/fixtures?league={league_id}&season={season}&date={date_str}"
+            url = f"{self.base_url}/fixtures?league={league_id}&season=2026&date={date_str}"
             response = requests.get(url, headers=self.headers, timeout=10)
-            
             if response.status_code == 200:
-                data = response.json()
-                if "errors" in data and data["errors"]:
-                    return [], str(data["errors"])
-                return data.get("response", []), None
-            elif response.status_code == 403:
-                return [], "Erro 403: Chave de API inválida."
-            else:
-                return [], f"Erro HTTP {response.status_code}"
-        except requests.exceptions.RequestException as e:
-            return [], f"Erro de conexão: {str(e)}"
+                return response.json().get("response", [])
+            return []
+        except requests.exceptions.RequestException:
+            return []
 
     def get_fixture_statistics(self, fixture_id: int) -> list:
         if not self.api_key:
@@ -90,7 +73,7 @@ class FootballAPIClient:
             return []
 
 # =====================================================================
-# BLOCO 3: MOTOR ANALÍTICO E CRONÔMETRO DIGITAL
+# BLOCO 3: MOTOR ANALÍTICO E CRONÔMETRO DIGITAL ESTILO LIVE
 # =====================================================================
 
 class MatchAnalyticsEngine:
@@ -138,9 +121,10 @@ class MatchAnalyticsEngine:
 
     @staticmethod
     def get_match_timer_info(match_date_str: str) -> tuple:
+        """Retorna o cronômetro em formato HH:MM:SS e o horário local da partida."""
         try:
             match_time = datetime.fromisoformat(match_date_str.replace("Z", "+00:00"))
-            local_time_str = match_time.astimezone().strftime("%H:%M")
+            local_time_str = match_time.strftime("%H:%M")
             
             now = datetime.now(timezone.utc)
             diff = match_time - now
@@ -159,7 +143,7 @@ class MatchAnalyticsEngine:
             return "--:--:--", "00:00"
 
 # =====================================================================
-# BLOCO 4: DESIGN DE INTERFACE E ESTILOS VISUAIS
+# BLOCO 4: DESIGN DE INTERFACE E ESTILOS VISUAIS (TEMA LIVE)
 # =====================================================================
 
 def configure_page_styles():
@@ -167,7 +151,7 @@ def configure_page_styles():
         page_title="Painel de Partidas - Live",
         page_icon="⚽",
         layout="centered",
-        initial_sidebar_state="expanded"
+        initial_sidebar_state="collapsed"
     )
     st.markdown(
         f"""
@@ -215,66 +199,44 @@ def configure_page_styles():
 
 def render_sidebar_admin():
     with st.sidebar:
-        st.markdown("### ⚙️ Painel ADM & Configuração")
+        st.markdown("### ⚙️ Painel ADM (Controle)")
         st.divider()
         
-        default_key = ""
-        try:
-            default_key = st.secrets.get("API_FOOTBALL_KEY", "")
-        except Exception:
-            pass
-
-        api_key_input = st.text_input("Chave da API-Football", value=default_key, type="password")
-        st.session_state.api_key = api_key_input
-
-        st.divider()
-        selected_name = st.selectbox("Campeonato Mundial", options=list(LEAGUES.keys()))
-        st.session_state.selected_league = LEAGUES[selected_name]
+        password = st.text_input("Senha de Acesso", type="password")
+        if password == "admin123":
+            st.session_state.admin_mode = True
+            st.success("Acesso Autorizado")
         
-        st.divider()
-        if st.button("🔄 Limpar Cache / Recarregar"):
-            st.cache_data.clear()
-            st.rerun()
+        if st.session_state.get("admin_mode", False):
+            selected_name = st.selectbox("Campeonato Mundial", options=list(LEAGUES.keys()))
+            st.session_state.selected_league = LEAGUES[selected_name]
+        else:
+            st.info("Insira a senha 'admin123' para alternar as ligas.")
 
 # =====================================================================
-# BLOCO 5: CONTROLADOR PRINCIPAL DA APLICAÇÃO
+# BLOCO 5: CONTROLADOR PRINCIPAL DA APLICAÇÃO (ATUALIZAÇÃO A CADA 1S)
 # =====================================================================
 
 configure_page_styles()
 
+if "admin_mode" not in st.session_state:
+    st.session_state.admin_mode = False
 if "selected_league" not in st.session_state:
     st.session_state.selected_league = list(LEAGUES.values())[0]
 
-render_sidebar_admin()
-
-api_key = st.session_state.get("api_key", "")
-api_client = FootballAPIClient(api_key)
+api_client = FootballAPIClient()
 analytics = MatchAnalyticsEngine()
 
-st.markdown("<h2 style='text-align: center; color: white; margin-bottom: 20px;'>⚽ Painel de Transmissão</h2>", unsafe_allow_html=True)
+render_sidebar_admin()
 
-if not api_key:
-    st.warning("⚠️ Insira a sua chave da API-Football no painel lateral à esquerda para carregar os jogos.")
-    st.stop()
+st.markdown("<h2 style='text-align: center; color: white; margin-bottom: 20px;'>⚽ Painel de Transmissão</h2>", unsafe_allow_html=True)
 
 @st.fragment(run_every="1s")
 def render_live_dashboard():
     league_id = st.session_state.selected_league
-    
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    matches, error_msg = api_client.get_fixtures_by_date(league_id, today_str)
+    matches = api_client.get_fixtures_by_date(league_id, today_str)
     
-    if error_msg:
-        st.error(f"⚠️ Erro ao consultar API: {error_msg}")
-        return
-
-    if not matches:
-        yesterday_str = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
-        tomorrow_str = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%d")
-        m_yes, _ = api_client.get_fixtures_by_date(league_id, yesterday_str)
-        m_tom, _ = api_client.get_fixtures_by_date(league_id, tomorrow_str)
-        matches = m_yes + m_tom
-
     if not matches:
         st.info("Nenhuma partida agendada para hoje nesta liga.")
         return
