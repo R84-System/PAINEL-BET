@@ -1,6 +1,6 @@
 """
 Painel Inteligente de Futebol para Transmissões ao Vivo
-Cobertura Global de Ligas - Arquitetura Modular Sênior (Corrigida)
+Cobertura Global de Ligas - Arquitetura Modular Sênior (Com API Embutida)
 """
 
 import streamlit as st
@@ -42,9 +42,9 @@ UI_THEME = {
 
 class FootballAPIClient:
     def __init__(self):
-        self.api_key = st.secrets.get("API_FOOTBALL_KEY", "")
+        # Chave inserida diretamente no código para evitar problemas com Secrets
+        self.api_key = "c6c045752fef0a0759a2447ec070dbdd064f9a61d55c52fd1d59a052612f1da0"
         self.base_url = "https://v3.football.api-sports.io"
-        # Ajustado para o cabeçalho correto da API-Sports direto (evita erro 403 / Missing key)
         self.headers = {
             "x-apisports-key": self.api_key
         }
@@ -52,10 +52,8 @@ class FootballAPIClient:
     def _get_active_season(self, league_id: int) -> int:
         now = datetime.now()
         year = now.year
-        # Ligas de ano calendário (Brasil, Argentina, EUA)
         if league_id in [71, 128, 253]:
             return year
-        # Ligas europeias (temporada europeia começa no meio do ano)
         if now.month < 7:
             return year - 1
         return year
@@ -243,7 +241,6 @@ def render_live_dashboard():
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     matches = api_client.get_fixtures_by_date(league_id, today_str)
     
-    # Se não houver jogos hoje, busca em dias próximos (ontem/amanhã) para facilitar seus testes e visualização
     if not matches:
         yesterday_str = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
         tomorrow_str = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%d")
