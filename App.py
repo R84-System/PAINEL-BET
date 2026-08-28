@@ -1,4 +1,5 @@
 from datetime import datetime
+import pytz
 import requests
 import streamlit as st
 
@@ -6,7 +7,7 @@ st.set_page_config(
     page_title="Painel Pro de Futebol", page_icon="⚽", layout="wide"
 )
 
-# CSS avançado para animações, barra de LED e ticker superior
+# CSS avançado para o Ticker em fundo branco clarinho, nomes em amarelo e placar em preto
 st.markdown(
     """
 <style>
@@ -113,18 +114,56 @@ def fetch_match_summary(slug, event_id):
     return {}
 
 
-def format_time_am_pm(date_str, default_detail=""):
-  """Converte string de data ISO para o formato de horário AM/PM estrito."""
-  if date_str:
-    try:
-      dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
-      return dt.strftime("%I:%M %p")
-    except Exception:
-      pass
-  if default_detail:
-    # Tenta limpar ou padronizar se já contiver horários
-    return default_detail
-  return "Em breve"
+def format_datetime_brasilia(date_str):
+  """Converte para o fuso de Brasília (America/Sao_Paulo), retornando Dia da Semana, Data DD/MM e Horário AM/PM."""
+  if not date_str:
+    return "Em breve"
+  try:
+    dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+    fuso_brasilia = pytz.timezone("America/Sao_Paulo")
+    dt_br = dt.astimezone(fuso_brasilia)
+
+    dias_semana = {
+        "Monday": "Segunda-feira",
+        "Tuesday": "Terça-feira",
+        "Wednesday": "Quarta-feira",
+        "Thursday": "Quinta-feira",
+        "Friday": "Sexta-feira",
+        "Saturday": "Sábado",
+        "Sunday": "Domingo",
+    }
+    dia_eng = dt_br.strftime("%A")
+    dia_pt = dias_semana.get(dia_eng, dia_eng)
+
+    data_formatada = dt_br.strftime("%d/%m")
+    horario_am_pm = dt_br.strftime("%I:%M %p")
+
+    return f"{dia_pt}, {data_formatada} às {horario_am_pm}"
+  except Exception:
+    return "Horário a confirmar"
+
+
+def extract_venue(event):
+  """Extrai o nome do estádio e local da partida."""
+  try:
+    competition = event.get("competitions", [{}])[0]
+    venue = competition.get("venue", {})
+    v_name = venue.get("fullName", "")
+    address = venue.get("address", {})
+    city = address.get("city", "")
+    country = address.get("country", "")
+
+    loc_parts = []
+    if v_name:
+      loc_parts.append(v_name)
+    if city:
+      loc_parts.append(city)
+    if country and country != "Brazil":
+      loc_parts.append(country)
+
+    return " - ".join(loc_parts) if loc_parts else "Local não informado"
+  except Exception:
+    return "Local não informado"
 
 
 def extract_stats(summary_data):
@@ -207,7 +246,7 @@ def get_custom_bar(percentage, side):
 
 
 def render_live_ticker():
-  """Renderiza o ticker contínuo no topo, visível em QUALQUER aba/janela."""
+  """Ticker ao vivo no topo com fundo branco clarinho, nomes em amarelo e placar em preto."""
   ticker_matches = []
   for l_name, l_slug in LEAGUES.items():
     if l_slug == "all_live":
@@ -233,18 +272,23 @@ def render_live_ticker():
             )
             a_score = c.get("score", "0")
         clock = comp.get("status", {}).get("displayClock", "")
-        ticker_matches.append(
-            f"⚽ {h_team} &nbsp;<b>{h_score} x {a_score}</b>&nbsp; {a_team}"
-            f" &nbsp;({clock})"
+        # Nomes em amarelo escuro/destacado visível no branco (#b45309 ou #ca8a04) e placar em preto (#000000)
+        item_html = (
+            f"⚽ <span style='color: #b45309; font-weight: 900;'>{h_team}</span>"
+            f" &nbsp;<span style='color: #000000; background-color: #e2e8f0; padding:"
+            f" 2px 6px; border-radius: 4px;'><b>{h_score} x {a_score}</b></span>"
+            f"&nbsp; <span style='color: #b45309; font-weight:"
+            f" 900;'>{a_team}</span> &nbsp;({clock})"
         )
+        ticker_matches.append(item_html)
 
   if ticker_matches:
     content = " &nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp; ".join(ticker_matches)
     st.markdown(
         f"""
-        <div style="background-color: #1e293b; padding: 10px; border-radius: 8px; border: 1px solid #334155; margin-bottom: 15px;">
-            <div style="font-size: 11px; color: #22c55e; font-weight: bold; margin-bottom: 4px;">🟢 TICKER AO VIVO (GLOBAL) - PLACAR EM TEMPO REAL</div>
-            <marquee behavior="scroll" direction="left" scrollamount="4" style="color: white; font-weight: bold; font-size: 14px;">
+        <div style="background-color: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1; margin-bottom: 15px;">
+            <div style="font-size: 11px; color: #16a34a; font-weight: bold; margin-bottom: 4px;">🟢 TICKER AO VIVO (GLOBAL) - PLACAR EM TEMPO REAL</div>
+            <marquee behavior="scroll" direction="left" scrollamount="4" style="color: #0f172a; font-weight: bold; font-size: 14px;">
                 {content}
             </marquee>
         </div>
@@ -327,8 +371,9 @@ def render_live_panel(slug, league_name, query):
     raw_detail = status_type.get("detail", "")
     event_date = event.get("date", "")
 
-    # Conversão rigorosa de horário para AM/PM caso o jogo não tenha começado
-    formatted_kickoff = format_time_am_pm(event_date, raw_detail)
+    # Horário formatado em Brasília (Dia da semana, Data DD/MM e Horário AM/PM)
+    formatted_kickoff = format_datetime_brasilia(event_date)
+    venue_name = extract_venue(event)
 
     status_obj = competition.get("status", {})
     display_clock = status_obj.get("displayClock", "")
@@ -417,8 +462,9 @@ def render_live_panel(slug, league_name, query):
         st.markdown(
             f"""
                 <div style='text-align: center;'>
-                    <span style='background-color:#3b82f6; color:white; padding:4px 10px; border-radius:6px; font-size:11px; font-weight:bold;'>🕒 {formatted_kickoff}</span>
-                    <h3 style='color:#94a3b8; margin:6px 0;'>vs</h3>
+                    <span style='background-color:#3b82f6; color:white; padding:4px 8px; border-radius:6px; font-size:11px; font-weight:bold;'>🕒 {formatted_kickoff}</span>
+                    <div style='font-size: 11px; color: #94a3b8; margin-top: 3px;'>📍 {venue_name}</div>
+                    <h3 style='color:#94a3b8; margin:4px 0;'>vs</h3>
                 </div>
                 """,
             unsafe_allow_html=True,
