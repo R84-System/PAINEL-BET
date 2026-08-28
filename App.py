@@ -1,6 +1,6 @@
 """
 Painel Inteligente de Futebol para Transmissões ao Vivo
-Arquitetura Modular - Padrão Sênior
+Cobertura Global de Ligas - Arquitetura Modular Sênior
 """
 
 import streamlit as st
@@ -8,15 +8,23 @@ from datetime import datetime, timezone
 import requests
 
 # =====================================================================
-# BLOCO 1: CONFIGURAÇÕES E CONSTANTES GLOBAIS
+# BLOCO 1: CONFIGURAÇÕES E MAPA GLOBAL DE LIGAS (PRIMEIRAS DIVISÕES)
 # =====================================================================
 
 LEAGUES = {
-    "Brasileirão Série A": 71,
-    "Premier League": 39,
-    "Champions League": 2,
-    "La Liga": 140,
-    "Libertadores": 13,
+    "🇧🇷 Brasileirão Série A": 71,
+    "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League (Inglaterra)": 39,
+    "🇪🇸 La Liga (Espanha)": 140,
+    "🇮🇹 Serie A (Itália)": 135,
+    "🇩🇪 Bundesliga (Alemanha)": 78,
+    "🇫🇷 Ligue 1 (França)": 61,
+    "🇵🇹 Primeira Liga (Portugal)": 94,
+    "🇳🇱 Eredivisie (Holanda)": 88,
+    "🇦🇷 Liga Profesional (Argentina)": 128,
+    "🇺🇸 MLS (Estados Unidos)": 253,
+    "🇸🇦 Saudi Pro League (Arábia Saudita)": 307,
+    "🌎 Copa Libertadores": 13,
+    "🇪🇺 Champions League": 2,
 }
 
 UI_THEME = {
@@ -29,7 +37,7 @@ UI_THEME = {
 }
 
 # =====================================================================
-# BLOCO 2: CLIENTE DE API (INTEGRAÇÃO EXTERNA)
+# BLOCO 2: CLIENTE DE API (INTEGRAÇÃO COM A API-FOOTBALL)
 # =====================================================================
 
 class FootballAPIClient:
@@ -66,7 +74,7 @@ class FootballAPIClient:
             return []
 
 # =====================================================================
-# BLOCO 3: MOTOR ANALÍTICO E PROCESSAMENTO DE DADOS
+# BLOCO 3: MOTOR ANALÍTICO E CRONÔMETRO REVERSO INTELIGENTE
 # =====================================================================
 
 class MatchAnalyticsEngine:
@@ -123,23 +131,25 @@ class MatchAnalyticsEngine:
             if total_seconds <= 0:
                 return "Iniciando..."
             
-            minutes = total_seconds // 60
-            if minutes < 60:
-                return f"Inicia em {minutes} min"
+            # Se faltar menos de 1 hora (3600 segundos), ativa o cronômetro reverso detalhado
+            if total_seconds <= 3600:
+                minutes = total_seconds // 60
+                seconds = total_seconds % 60
+                return f"⚠️ Começa em {minutes:02d}m {seconds:02d}s"
             
-            hours = minutes // 60
-            rem_mins = minutes % 60
+            hours = total_seconds // 3600
+            rem_mins = (total_seconds % 3600) // 60
             return f"Inicia em {hours}h {rem_mins}m"
         except Exception:
             return "Pré-jogo"
 
 # =====================================================================
-# BLOCO 4: COMPONENTES DE INTERFACE (UI & ESTILOS)
+# BLOCO 4: DESIGN DE INTERFACE E ESTILOS CSS
 # =====================================================================
 
 def configure_page_styles():
     st.set_page_config(
-        page_title="Central Inteligente de Futebol",
+        page_title="Central Inteligente de Partidas",
         page_icon="⚽",
         layout="wide",
         initial_sidebar_state="collapsed"
@@ -191,10 +201,10 @@ def render_sidebar_admin():
             st.success("Acesso Autorizado")
         
         if st.session_state.get("admin_mode", False):
-            selected_name = st.selectbox("Campeonato", options=list(LEAGUES.keys()))
+            selected_name = st.selectbox("Campeonato Mundial", options=list(LEAGUES.keys()))
             st.session_state.selected_league = LEAGUES[selected_name]
         else:
-            st.info("Insira a senha 'admin123' para gerenciar.")
+            st.info("Insira a senha 'admin123' para alternar as ligas mundiais.")
 
 # =====================================================================
 # BLOCO 5: CONTROLADOR PRINCIPAL DA APLICAÇÃO
@@ -212,16 +222,16 @@ analytics = MatchAnalyticsEngine()
 
 render_sidebar_admin()
 
-st.title("⚽ Painel Inteligente de Partidas")
+st.title("⚽ Painel Inteligente de Partidas (Global)")
 
-@st.fragment(run_every="30s")
+@st.fragment(run_every="5s")
 def render_live_dashboard():
     league_id = st.session_state.selected_league
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     matches = api_client.get_fixtures_by_date(league_id, today_str)
     
     if not matches:
-        st.info("Nenhuma partida encontrada para hoje nesta liga.")
+        st.info("Nenhuma partida agendada para hoje nesta liga. O painel exibirá os confrontos assim que houverem novas rodadas.")
         return
 
     for match in matches:
