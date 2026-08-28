@@ -1,6 +1,6 @@
 """
 Painel Inteligente de Futebol para Transmissões ao Vivo
-Versão com Inserção de Chave via Painel Lateral
+Versão com Inserção de Chave via Painel Lateral (Corrigido)
 """
 
 import streamlit as st
@@ -218,7 +218,6 @@ def render_sidebar_admin():
         st.markdown("### ⚙️ Painel ADM & Configuração")
         st.divider()
         
-        # Tenta pegar dos secrets do Streamlit, senão permite digitar aqui
         default_key = ""
         try:
             default_key = st.secrets.get("API_FOOTBALL_KEY", "")
@@ -296,7 +295,7 @@ def render_live_dashboard():
         home_logo = teams.get("home", {}).get("logo", "")
         away_logo = teams.get("away", {}).get("logo", "")
         
-        home_goals = goals.get("home") if goals.get("home"] is not None else 0
+        home_goals = goals.get("home") if goals.get("home") is not None else 0
         away_goals = goals.get("away") if goals.get("away") is not None else 0
         
         with st.container():
