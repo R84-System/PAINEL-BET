@@ -1,10 +1,10 @@
 """
 Painel Inteligente de Futebol para Transmissões ao Vivo
-Cobertura Global de Ligas - Arquitetura Modular Sênior
+Cobertura Global de Ligas - Arquitetura Modular Sênior (Corrigida)
 """
 
 import streamlit as st
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import requests
 
 # =====================================================================
@@ -37,26 +37,40 @@ UI_THEME = {
 }
 
 # =====================================================================
-# BLOCO 2: CLIENTE DE API (INTEGRAÇÃO COM A API-FOOTBALL)
+# BLOCO 2: CLIENTE DE API (INTEGRAÇÃO COM A API-SPORTS)
 # =====================================================================
 
 class FootballAPIClient:
     def __init__(self):
         self.api_key = st.secrets.get("API_FOOTBALL_KEY", "")
         self.base_url = "https://v3.football.api-sports.io"
+        # Ajustado para o cabeçalho correto da API-Sports direto (evita erro 403 / Missing key)
         self.headers = {
-            "x-rapidapi-key": self.api_key,
-            "x-rapidapi-host": "v3.football.api-sports.io"
+            "x-apisports-key": self.api_key
         }
+
+    def _get_active_season(self, league_id: int) -> int:
+        now = datetime.now()
+        year = now.year
+        # Ligas de ano calendário (Brasil, Argentina, EUA)
+        if league_id in [71, 128, 253]:
+            return year
+        # Ligas europeias (temporada europeia começa no meio do ano)
+        if now.month < 7:
+            return year - 1
+        return year
 
     def get_fixtures_by_date(self, league_id: int, date_str: str) -> list:
         if not self.api_key:
             return []
+        
+        season = self._get_active_season(league_id)
         try:
-            url = f"{self.base_url}/fixtures?league={league_id}&season=2026&date={date_str}"
+            url = f"{self.base_url}/fixtures?league={league_id}&season={season}&date={date_str}"
             response = requests.get(url, headers=self.headers, timeout=10)
             if response.status_code == 200:
-                return response.json().get("response", [])
+                data = response.json()
+                return data.get("response", [])
             return []
         except requests.exceptions.RequestException:
             return []
@@ -131,7 +145,6 @@ class MatchAnalyticsEngine:
             if total_seconds <= 0:
                 return "Iniciando..."
             
-            # Se faltar menos de 1 hora (3600 segundos), ativa o cronômetro reverso detalhado
             if total_seconds <= 3600:
                 minutes = total_seconds // 60
                 seconds = total_seconds % 60
@@ -230,8 +243,16 @@ def render_live_dashboard():
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     matches = api_client.get_fixtures_by_date(league_id, today_str)
     
+    # Se não houver jogos hoje, busca em dias próximos (ontem/amanhã) para facilitar seus testes e visualização
     if not matches:
-        st.info("Nenhuma partida agendada para hoje nesta liga. O painel exibirá os confrontos assim que houverem novas rodadas.")
+        yesterday_str = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+        tomorrow_str = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%d")
+        matches_yes = api_client.get_fixtures_by_date(league_id, yesterday_str)
+        matches_tom = api_client.get_fixtures_by_date(league_id, tomorrow_str)
+        matches = matches_yes + matches_tom
+
+    if not matches:
+        st.info("Nenhuma partida agendada recentemente para esta liga. O painel exibirá os confrontos assim que houverem novas rodadas.")
         return
 
     for match in matches:
