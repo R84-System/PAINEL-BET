@@ -7,7 +7,7 @@ st.set_page_config(
     page_title="Painel Pro de Futebol", page_icon="⚽", layout="wide"
 )
 
-# CSS otimizado para transições mais suaves (mais liso) e alerta de gol pontual
+# CSS otimizado para transições suaves e isolamento de layout (eliminação do pisca-pisca)
 st.markdown(
     """
 <style>
@@ -37,12 +37,14 @@ st.markdown(
     padding: 2px 8px;
     display: inline-block;
 }
+div[data-testid="stVerticalBlock"] {
+    transition: none !important;
+}
 </style>
 """,
     unsafe_allow_html=True,
 )
 
-# Mapeamento completo de Ligas, Copas e Internacionais com slugs oficiais da ESPN
 LEAGUES = {
     "🟢 Todos os Jogos ao Vivo (Global)": "all_live",
     "🇧🇷 Brasileirão Série A": "bra.1",
@@ -110,7 +112,6 @@ def format_datetime_brasilia(date_str):
     dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
     fuso_brasilia = pytz.timezone("America/Sao_Paulo")
     dt_br = dt.astimezone(fuso_brasilia)
-
     dias_semana = {
         "Monday": "Segunda-feira",
         "Tuesday": "Terça-feira",
@@ -136,7 +137,6 @@ def extract_venue(event):
     address = venue.get("address", {})
     city = address.get("city", "")
     country = address.get("country", "")
-
     loc_parts = []
     if v_name:
       loc_parts.append(v_name)
@@ -144,7 +144,6 @@ def extract_venue(event):
       loc_parts.append(city)
     if country and country != "Brazil":
       loc_parts.append(country)
-
     return " - ".join(loc_parts) if loc_parts else "Local não informado"
   except Exception:
     return "Local não informado"
@@ -180,69 +179,38 @@ def extract_red_cards(summary_data, home_team_id, away_team_id):
 
 
 def extract_goals(summary_data):
-  """Extrai os autores dos gols e o tempo cobrindo scoringPlays e details da API."""
   goals_list = []
-
-  # 1. Verifica scoringPlays (padrão principal da ESPN)
   scoring_plays = summary_data.get("scoringPlays", [])
-  for play in scoring_plays:
-    clock = play.get("clock", {}).get("displayValue", "")
-    text = str(play.get("text", ""))
-    team_name = play.get("team", {}).get("displayName", "")
-
-    athletes = play.get("athletesInvolved", [])
-    if athletes:
-      scorer = athletes[0].get("displayName", "Gol")
-    elif play.get("athlete"):
-      scorer = play.get("athlete", {}).get("displayName", "Gol")
-    else:
-      scorer = "Gol"
-
-    is_own_goal = "own goal" in text.lower() or "contra" in text.lower()
-    goal_entry = {
-        "scorer": f"{scorer} (Contra)" if is_own_goal else scorer,
-        "clock": clock if clock else "0'",
-        "team": team_name,
-    }
-    if goal_entry not in goals_list:
-      goals_list.append(goal_entry)
-
-  # 2. Verifica detalhes gerais para garantir que nenhum gol fique de fora
-  details = summary_data.get("details", [])
-  for item in details:
-    item_type = item.get("type", {})
-    text_type = str(item_type.get("text", "")).lower()
-    scoring_type = str(item.get("scoringType", {}).get("name", "")).lower()
-
-    if (
-        "goal" in text_type
-        or "gol" in text_type
-        or scoring_type == "goal"
-        or item.get("scoring", False)
-    ):
-      athlete = item.get("athlete", {})
-      scorer = athlete.get("displayName", "")
-      if not scorer:
-        athletes_inv = item.get("athletesInvolved", [])
-        if athletes_inv:
-          scorer = athletes_inv[0].get("displayName", "Gol")
-        else:
-          scorer = "Gol"
-
-      clock = item.get("clock", {}).get("displayValue", "")
-      team_name = item.get("team", {}).get("displayName", "")
-      is_own_goal = (
-          "own goal" in text_type or "contra" in text_type or "og" in text_type
-      )
-
-      goal_entry = {
+  if scoring_plays:
+    for play in scoring_plays:
+      clock = play.get("clock", {}).get("displayValue", "")
+      text = play.get("text", "")
+      athletes = play.get("athletesInvolved", [])
+      scorer = athletes[0].get("displayName", "Gol") if athletes else "Gol"
+      team = play.get("team", {}).get("displayName", "")
+      is_own_goal = "own goal" in text.lower() or "contra" in text.lower()
+      goals_list.append({
           "scorer": f"{scorer} (Contra)" if is_own_goal else scorer,
-          "clock": clock if clock else "0'",
-          "team": team_name,
-      }
-      if goal_entry not in goals_list:
-        goals_list.append(goal_entry)
-
+          "clock": clock,
+          "team": team,
+      })
+  else:
+    details = summary_data.get("details", [])
+    for item in details:
+      text = str(item.get("type", {}).get("text", "")).lower()
+      if "goal" in text or "gol" in text:
+        athlete = item.get("athlete", {})
+        scorer = athlete.get("displayName", "Gol")
+        clock = item.get("clock", {}).get("displayValue", "")
+        team = item.get("team", {}).get("displayName", "")
+        is_own_goal = (
+            "own goal" in text or "contra" in text or "gol contra" in text
+        )
+        goals_list.append({
+            "scorer": f"{scorer} (Contra)" if is_own_goal else scorer,
+            "clock": clock,
+            "team": team,
+        })
   return goals_list
 
 
@@ -259,18 +227,15 @@ def calculate_pressure(home_stats, away_stats):
       + (parse_num(home_stats.get("wonCorners", 0)) * 1.5)
       + (parse_num(home_stats.get("possessionPct", 50)) * 0.2)
   )
-
   a_score = (
       (parse_num(away_stats.get("shotsOnTarget", 0)) * 3.0)
       + (parse_num(away_stats.get("totalShots", 0)) * 1.0)
       + (parse_num(away_stats.get("wonCorners", 0)) * 1.5)
       + (parse_num(away_stats.get("possessionPct", 50)) * 0.2)
   )
-
   total = h_score + a_score
   if total == 0:
     return 50, 50
-
   h_pct = int(round((h_score / total) * 100))
   return h_pct, 100 - h_pct
 
@@ -282,9 +247,7 @@ def get_custom_bar(percentage, side):
     color, label = "#ffffff", "⚖️ Neutro"
   else:
     color, label = "#ef4444", "🛡️ Defensiva / Baixa"
-
   align = "right" if side == "home" else "left"
-
   return f"""
     <div style="text-align: {align}; margin-top: 6px;">
         <span style="font-size: 11px; color: {color}; font-weight: bold;">{label} ({percentage}%)</span>
@@ -295,9 +258,9 @@ def get_custom_bar(percentage, side):
     """
 
 
-@st.fragment(run_every=3)
-def render_live_panel(slug, league_name, query):
-  # Ticker e painel unificados no mesmo fragmento para garantir atualização 100% síncrona
+# Ticker isolado em fragmento para atualizar de forma síncrona sem piscar o corpo principal
+@st.fragment(run_every=2)
+def render_live_ticker():
   ticker_matches = []
   for l_name, l_slug in LEAGUES.items():
     if l_slug == "all_live":
@@ -346,6 +309,22 @@ def render_live_panel(slug, league_name, query):
         unsafe_allow_html=True,
     )
 
+
+st.title("⚽ Painel Pro de Futebol ao Vivo")
+
+st.sidebar.title("⚙️ Configurações")
+selected_league_name = st.sidebar.selectbox("Campeonato", list(LEAGUES.keys()))
+league_slug = LEAGUES[selected_league_name]
+
+search_query = st.text_input(
+    "🔍 Buscar time (ex: Flamengo, Real Madrid, Al Nassr...)", ""
+).strip().lower()
+
+render_live_ticker()
+
+
+@st.fragment(run_every=2)
+def render_live_panel(slug, league_name, query):
   matches_to_display = []
 
   if query:
@@ -553,7 +532,6 @@ def render_live_panel(slug, league_name, query):
         f"📊 Ver Estatísticas Detalhadas ({home_team} vs {away_team})"
     ):
       h_stats, a_stats = stats["home"], stats["away"]
-
       poss_h = h_stats.get("possessionPct", "0")
       if not poss_h.endswith("%"):
         poss_h = f"{poss_h}%" if poss_h != "0" else "0%"
@@ -630,15 +608,4 @@ def render_live_panel(slug, league_name, query):
     st.divider()
 
 
-st.title("⚽ Painel Pro de Futebol ao Vivo")
-
-st.sidebar.title("⚙️ Configurações")
-selected_league_name = st.sidebar.selectbox("Campeonato", list(LEAGUES.keys()))
-league_slug = LEAGUES[selected_league_name]
-
-search_query = st.text_input(
-    "🔍 Buscar time (ex: Flamengo, Real Madrid, Al Nassr...)", ""
-).strip().lower()
-
-# Executa o painel e o ticker sincronizados dentro do mesmo bloco reativo
 render_live_panel(league_slug, selected_league_name, search_query)
