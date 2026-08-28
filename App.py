@@ -1,6 +1,6 @@
 """
 Painel Inteligente de Futebol para Transmissões ao Vivo
-Cobertura Global de Ligas - Arquitetura Modular Sênior (Com API Embutida)
+Cobertura Global de Ligas - Arquitetura Modular Sênior (Com Diagnóstico/Debug)
 """
 
 import streamlit as st
@@ -37,17 +37,20 @@ UI_THEME = {
 }
 
 # =====================================================================
-# BLOCO 2: CLIENTE DE API (INTEGRAÇÃO COM A API-SPORTS)
+# BLOCO 2: CLIENTE DE API (INTEGRAÇÃO COM A API-SPORTS + DEBUG)
 # =====================================================================
 
 class FootballAPIClient:
     def __init__(self):
-        # Chave inserida diretamente no código para evitar problemas com Secrets
         self.api_key = "c6c045752fef0a0759a2447ec070dbdd064f9a61d55c52fd1d59a052612f1da0"
+        
+        # Opção 1: Site Oficial (api-sports.io)
         self.base_url = "https://v3.football.api-sports.io"
-        self.headers = {
-            "x-apisports-key": self.api_key
-        }
+        self.headers = {"x-apisports-key": self.api_key}
+        
+        # Opção 2: Se sua chave foi gerada no RapidAPI, comente as duas linhas acima e descomente abaixo:
+        # self.base_url = "https://api-football-v1.p.rapidapi.com/v3"
+        # self.headers = {"x-rapidapi-key": self.api_key, "x-rapidapi-host": "api-football-v1.p.rapidapi.com"}
 
     def _get_active_season(self, league_id: int) -> int:
         now = datetime.now()
@@ -66,11 +69,21 @@ class FootballAPIClient:
         try:
             url = f"{self.base_url}/fixtures?league={league_id}&season={season}&date={date_str}"
             response = requests.get(url, headers=self.headers, timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                return data.get("response", [])
+            
+            # --- DIAGNÓSTICO VISUAL NA TELA DO STREAMLIT ---
+            st.info(f"🔍 [DEBUG API] URL: {url} | Status: {response.status_code}")
+            try:
+                data_json = response.json()
+                st.json(data_json)
+                if response.status_code == 200:
+                    return data_json.get("response", [])
+            except Exception as ex:
+                st.text(f"Erro ao decodificar JSON: {ex}")
+                st.text(response.text)
+            
             return []
-        except requests.exceptions.RequestException:
+        except requests.exceptions.RequestException as e:
+            st.error(f"Erro de conexão com a API: {e}")
             return []
 
     def get_fixture_statistics(self, fixture_id: int) -> list:
