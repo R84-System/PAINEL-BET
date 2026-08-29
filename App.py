@@ -67,7 +67,6 @@ dashboard_html = """
             text-align: center;
             font-size: 14px;
             font-weight: bold;
-            animation: topGoalPulse 1.5s infinite ease-in-out;
             box-shadow: 0 0 15px rgba(34, 197, 94, 0.6);
             display: none;
             line-height: 1.4;
@@ -387,7 +386,9 @@ dashboard_html = """
             "usa.1": "MLS", "fifa.friendly": "Jogos Internacionais"
         };
 
-        let previousScores = {};
+        let matchScores = {};
+        let matchStates = {};
+        let initializedMatches = new Set();
         let summariesCache = {};
         let standingsCache = {};
         let openStates = {};
@@ -395,15 +396,13 @@ dashboard_html = """
         let pollInterval = null;
         let currentLoadedStandingsKey = "";
 
-        // Função que gera som de alerta de gol automaticamente (Toque Festivo/Corneta)
         function playGoalSound() {
             try {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
                 if (!AudioContext) return;
                 const ctx = new AudioContext();
                 
-                // Sequência de notas sonoras com sintetizador do navegador
-                let notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+                let notes = [523.25, 659.25, 783.99, 1046.50];
                 let now = ctx.currentTime;
                 
                 notes.forEach((freq, index) => {
@@ -517,14 +516,22 @@ dashboard_html = """
             }
         }
 
-        function triggerTopGoalAlert(scoringTeam, scorerName, hTeam, aTeam, hScore, aScore) {
+        function showBanner(content, isGoal = false) {
             let banner = document.getElementById('topGoalAlert');
             if (!banner) return;
-            banner.innerHTML = `⚽ GOL DO <b>${scoringTeam.toUpperCase()}</b><br>Autor: <b>${scorerName}</b><br><span style="font-size:13px; color:#facc15;">${hTeam} ${hScore} x ${aScore} ${aTeam}</span>`;
+            banner.innerHTML = content;
             banner.style.display = "block";
             
-            // Toca o som de gol automaticamente
-            playGoalSound();
+            if (isGoal) {
+                playGoalSound();
+                banner.style.animation = "topGoalPulse 1.5s infinite ease-in-out";
+                banner.style.backgroundColor = "#166534";
+                banner.style.borderColor = "#22c55e";
+            } else {
+                banner.style.animation = "none";
+                banner.style.backgroundColor = "#1e293b";
+                banner.style.borderColor = "#38bdf8";
+            }
 
             if (goalAlertTimer) clearTimeout(goalAlertTimer);
             goalAlertTimer = setTimeout(() => {
@@ -903,22 +910,40 @@ dashboard_html = """
                     }
                 }
 
-                let matchKey = `${eventId}`;
-                let scoreKey = `${homeScore}-${awayScore}`;
-                if (previousScores[matchKey] && previousScores[matchKey] !== scoreKey) {
-                    let [prevH, prevA] = previousScores[matchKey].split('-').map(Number);
-                    let curH = parseInt(homeScore), curA = parseInt(awayScore);
-                    
-                    let scoringTeamName = curH > prevH ? homeTeam : awayTeam;
-                    let scorerName = curH > prevH ? 
-                        (hGoalsList.length > 0 ? hGoalsList[hGoalsList.length - 1].replace(/<\/?[^>]+(>|$)/g, "").replace(/^⚽\s*(\(Pên\)\s*)?/, "") : "Desconhecido") :
-                        (aGoalsList.length > 0 ? aGoalsList[aGoalsList.length - 1].replace(/<\/?[^>]+(>|$)/g, "").replace(/^⚽\s*(\(Pên\)\s*)?/, "") : "Desconhecido");
-
-                    triggerTopGoalAlert(scoringTeamName, scorerName, homeTeam, awayTeam, homeScore, awayScore);
-                }
-                previousScores[matchKey] = scoreKey;
-
                 let state = competition.status.type.state;
+                let scoreKey = `${homeScore}-${awayScore}`;
+
+                if (!initializedMatches.has(eventId)) {
+                    initializedMatches.add(eventId);
+                    matchScores[eventId] = scoreKey;
+                    matchStates[eventId] = state;
+                } else {
+                    if (matchStates[eventId] === 'pre' && (state === 'in' || competition.status.type.name === 'STATUS_HALFTIME')) {
+                        showBanner(`🟢 Iniciou: <b>${homeTeam} ${homeScore} x ${awayScore} ${awayTeam}</b><br><span style="font-size:11px; color:#94a3b8;">${lName}</span>`, false);
+                    }
+
+                    if (matchStates[eventId] !== 'post' && state === 'post') {
+                        showBanner(`🏁 Finalizado: <b>${homeTeam} ${homeScore} x ${awayScore} ${awayTeam}</b><br><span style="font-size:11px; color:#94a3b8;">${lName}</span>`, false);
+                    }
+
+                    if (matchScores[eventId] && matchScores[eventId] !== scoreKey) {
+                        let [prevH, prevA] = matchScores[eventId].split('-').map(Number);
+                        let curH = parseInt(homeScore), curA = parseInt(awayScore);
+                        
+                        if (curH > prevH || curA > prevA) {
+                            let scoringTeamName = curH > prevH ? homeTeam : awayTeam;
+                            let scorerName = curH > prevH ? 
+                                (hGoalsList.length > 0 ? hGoalsList[hGoalsList.length - 1].replace(/<\/?[^>]+(>|$)/g, "").replace(/^⚽\s*(\(Pên\)\s*)?/, "") : "Desconhecido") :
+                                (aGoalsList.length > 0 ? aGoalsList[aGoalsList.length - 1].replace(/<\/?[^>]+(>|$)/g, "").replace(/^⚽\s*(\(Pên\)\s*)?/, "") : "Desconhecido");
+
+                            showBanner(`⚽ GOL DO <b>${scoringTeamName.toUpperCase()}</b><br>Autor: <b>${scorerName}</b><br><span style="font-size:13px; color:#facc15;">${homeTeam} ${homeScore} x ${awayScore} ${awayTeam}</span><br><span style="font-size:11px; color:#94a3b8;">${lName}</span>`, true);
+                        }
+                    }
+
+                    matchScores[eventId] = scoreKey;
+                    matchStates[eventId] = state;
+                }
+
                 let statusName = competition.status.type.name || "";
                 let rawDetail = competition.status.type.detail || "";
                 let displayClock = competition.status.displayClock || "";
