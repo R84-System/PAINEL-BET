@@ -198,10 +198,10 @@ dashboard_html = """
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
-            background: #1e3a8a;
+            background: #2563eb;
             padding: 10px;
             border-radius: 8px;
-            border: 1px solid #3b82f6;
+            border: 1px solid #60a5fa;
             box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         }
         .controls select, .controls input {
@@ -341,14 +341,14 @@ dashboard_html = """
 
         <div class="controls">
             <div>
-                <label style="font-size:11px; color:#93c5fd; display:block; margin-bottom:2px; font-weight:bold;">Visualização</label>
+                <label style="font-size:11px; color:#dbeafe; display:block; margin-bottom:2px; font-weight:bold;">Visualização</label>
                 <select id="viewSelect">
                     <option value="matches">⚽ Partidas & Jogos</option>
                     <option value="standings">📊 Classificação & Chaveamentos</option>
                 </select>
             </div>
             <div>
-                <label style="font-size:11px; color:#93c5fd; display:block; margin-bottom:2px; font-weight:bold;">Campeonato</label>
+                <label style="font-size:11px; color:#dbeafe; display:block; margin-bottom:2px; font-weight:bold;">Campeonato</label>
                 <select id="leagueSelect">
                     <option value="all_live">🟢 Todos os Jogos ao Vivo (Global)</option>
                     <option value="bra.1">🇧🇷 Brasileirão Série A</option>
@@ -376,7 +376,7 @@ dashboard_html = """
                 </select>
             </div>
             <div style="flex-grow: 1;" id="searchContainer">
-                <label style="font-size:11px; color:#93c5fd; display:block; margin-bottom:2px; font-weight:bold;">Buscar Time</label>
+                <label style="font-size:11px; color:#dbeafe; display:block; margin-bottom:2px; font-weight:bold;">Buscar Time</label>
                 <input type="text" id="searchInput" placeholder="Ex: Flamengo, Real Madrid, Grêmio...">
             </div>
         </div>
@@ -868,7 +868,8 @@ dashboard_html = """
                             clock: sp.clock,
                             team: sp.team,
                             athlete: sp.athlete,
-                            athletesInvolved: sp.athletesInvolved
+                            athletesInvolved: sp.athletesInvolved,
+                            period: sp.period
                         });
                     }
                 }
@@ -973,18 +974,58 @@ dashboard_html = """
                 }
 
                 let parseNum = (val) => { let n = parseFloat(String(val).replace("%","").trim()); return isNaN(n)?0:n; };
-                let hShotsOn = parseNum(hStats.shotsOnTarget || 0);
-                let hShotsTot = parseNum(hStats.totalShots || 0);
-                let hCorners = parseNum(hStats.wonCorners || 0);
-                let hPoss = parseNum(hStats.possessionPct || 50);
 
-                let aShotsOn = parseNum(aStats.shotsOnTarget || 0);
-                let aShotsTot = parseNum(aStats.totalShots || 0);
-                let aCorners = parseNum(aStats.wonCorners || 0);
-                let aPoss = parseNum(aStats.possessionPct || 50);
+                // Pressure calculation (resets/starts at 50/50 in the 2nd half based on current period/events)
+                let hScorePress = 0;
+                let aScorePress = 0;
+                let isSecondHalf = (period >= 2 || statusName.includes('SECOND_HALF') || rawDetail.toLowerCase().includes('2º tempo') || rawDetail.toLowerCase().includes('second half'));
 
-                let hScorePress = (hShotsOn * 3.0) + (hShotsTot * 1.0) + (hCorners * 1.5) + (hPoss * 0.2);
-                let aScorePress = (aShotsOn * 3.0) + (aShotsTot * 1.0) + (aCorners * 1.5) + (aPoss * 0.2);
+                if (isSecondHalf) {
+                    hScorePress = 10;
+                    aScorePress = 10;
+
+                    for (let d of allDetails) {
+                        let pNum = d.period?.number || d.clock?.period || 1;
+                        let clockVal = parseNum(d.clock?.displayValue || "0");
+                        
+                        if (pNum >= 2 || (pNum === 1 && clockVal > 45)) {
+                            let text = (d.type && d.type.text) ? d.type.text.toLowerCase() : "";
+                            let typeName = (d.type && d.type.name) ? d.type.name.toLowerCase() : "";
+                            let isHome = d.team && d.team.id === homeTeamId;
+                            let isAway = d.team && d.team.id === awayTeamId;
+
+                            let weight = 1;
+                            if (text.includes("goal") || text.includes("gol") || text.includes("penalty") || text.includes("pênalti")) {
+                                weight = 6;
+                            } else if (text.includes("yellow") || text.includes("amarelo")) {
+                                weight = 1.5;
+                            } else if (text.includes("red") || text.includes("vermelho")) {
+                                weight = 3;
+                            } else if (text.includes("shot") || text.includes("chute")) {
+                                weight = 2;
+                            } else if (text.includes("corner") || text.includes("escanteio")) {
+                                weight = 1.5;
+                            }
+
+                            if (isHome) hScorePress += weight;
+                            if (isAway) aScorePress += weight;
+                        }
+                    }
+                } else {
+                    let hShotsOn = parseNum(hStats.shotsOnTarget || 0);
+                    let hShotsTot = parseNum(hStats.totalShots || 0);
+                    let hCorners = parseNum(hStats.wonCorners || 0);
+                    let hPoss = parseNum(hStats.possessionPct || 50);
+
+                    let aShotsOn = parseNum(aStats.shotsOnTarget || 0);
+                    let aShotsTot = parseNum(aStats.totalShots || 0);
+                    let aCorners = parseNum(aStats.wonCorners || 0);
+                    let aPoss = parseNum(aStats.possessionPct || 50);
+
+                    hScorePress = (hShotsOn * 3.0) + (hShotsTot * 1.0) + (hCorners * 1.5) + (hPoss * 0.2);
+                    aScorePress = (aShotsOn * 3.0) + (aShotsTot * 1.0) + (aCorners * 1.5) + (aPoss * 0.2);
+                }
+
                 let totalPress = hScorePress + aScorePress;
                 let hPct = totalPress === 0 ? 50 : Math.round((hScorePress / totalPress) * 100);
                 let aPct = 100 - hPct;
