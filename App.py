@@ -575,6 +575,16 @@ dashboard_html = """
                     let entries = group.entries || [];
                     if (entries.length === 0) continue;
 
+                    // Ordena as entradas rigorosamente pela posição (rank) em ordem crescente
+                    entries.sort((a, b) => {
+                        let getRank = (ent) => {
+                            let s = {};
+                            for (let st of (ent.stats || [])) s[st.name] = st.displayValue;
+                            return parseInt(s.rank || 999);
+                        };
+                        return getRank(a) - getRank(b);
+                    });
+
                     html += `
                         <div style="font-weight:bold; color:#facc15; margin-top:15px; margin-bottom:5px;">${group.name || 'Tabela Principal'}</div>
                         <table class="standings-table">
