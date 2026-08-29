@@ -383,7 +383,16 @@ dashboard_html = """
             if (!dateStr) return "Em breve";
             try {
                 let dt = new Date(dateStr);
-                return dt.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+                let formatted = dt.toLocaleString('pt-BR', { 
+                    timeZone: 'America/Sao_Paulo', 
+                    weekday: 'short', 
+                    day: '2-digit', 
+                    month: '2-digit', 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                });
+                formatted = formatted.replace('.', '');
+                return formatted.charAt(0).toUpperCase() + formatted.slice(1);
             } catch(e) { return "Horário a confirmar"; }
         }
 
