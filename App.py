@@ -271,7 +271,7 @@ dashboard_html = """
     <div id="topGoalAlert" class="top-goal-banner"></div>
 
     <div class="ticker-bar" id="tickerContainer" style="display:none;">
-        <div class="ticker-title">🟢 TICKER AO VIVO (GLOBAL) - PLACAR EM TEMPO REAL</div>
+        <div class="ticker-title">🟢 AO VIVO (GLOBAL) - PLACAR EM TEMPO REAL</div>
         <div class="ticker-wrap">
             <div class="ticker-move" id="tickerContent"></div>
         </div>
@@ -308,7 +308,7 @@ dashboard_html = """
         </div>
         <div style="flex-grow: 1;">
             <label style="font-size:12px; color:#94a3b8; display:block; margin-bottom:4px;">Buscar Time</label>
-            <input type="text" id="searchInput" placeholder="Ex: Flamengo, Real Madrid, Goiás...">
+            <input type="text" id="searchInput" placeholder="digite aqui">
         </div>
     </div>
 
