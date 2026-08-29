@@ -271,7 +271,6 @@ dashboard_html = """
             text-align: left;
             font-weight: bold;
         }
-        /* Estilos para Chaveamento em Árvore / Mata-Mata */
         .bracket-container {
             display: flex;
             flex-direction: column;
@@ -307,7 +306,7 @@ dashboard_html = """
         ⚽ Painel Pro de Futebol ao Vivo
     </h2>
 
-    <!-- ALERTA DE GOL EM TEMPO REAL NO TOPO -->
+    <!-- ALERTA DE GOL NO TOPO FORMATADO EXATAMENTE COMO SOLICITADO -->
     <div id="topGoalAlert" class="top-goal-banner"></div>
 
     <div class="ticker-bar" id="tickerContainer" style="display:none;">
@@ -375,9 +374,11 @@ dashboard_html = """
 
         let previousScores = {};
         let summariesCache = {};
+        let standingsCache = {};
         let openStates = {};
         let goalAlertTimer = null;
         let pollInterval = null;
+        let currentLoadedStandingsKey = "";
 
         function formatDateBrasilia(dateStr) {
             if (!dateStr) return "Em breve";
@@ -444,7 +445,8 @@ dashboard_html = """
         function triggerTopGoalAlert(scoringTeam, scorerName, hTeam, aTeam, hScore, aScore) {
             let banner = document.getElementById('topGoalAlert');
             if (!banner) return;
-            banner.innerHTML = `🚨 GOL DO <b>${scoringTeam.toUpperCase()}</b> - Autor: <b>${scorerName}</b><br><span style="font-size:14px; color:#facc15;">${hTeam} ${hScore} x ${aScore} ${aTeam}</span>`;
+            // ALERTA DE GOL EXATAMENTE COMO SOLICITADO: Destaque time e quem marcou, abaixo o placar
+            banner.innerHTML = `⚽ GOL DO <b>${scoringTeam.toUpperCase()}</b><br>Autor: <b>${scorerName}</b><br><span style="font-size:14px; color:#facc15;">${hTeam} ${hScore} x ${aScore} ${aTeam}</span>`;
             banner.style.display = "block";
             if (goalAlertTimer) clearTimeout(goalAlertTimer);
             goalAlertTimer = setTimeout(() => {
@@ -456,6 +458,16 @@ dashboard_html = """
             let selectedLeague = document.getElementById('leagueSelect').value;
             let lSlug = selectedLeague === 'all_live' ? 'bra.1' : selectedLeague;
             let mainContainer = document.getElementById('mainContainer');
+
+            // Se já temos em cache para esta liga, exibe instantaneamente sem piscar / recarregar
+            if (standingsCache[lSlug]) {
+                if (currentLoadedStandingsKey !== lSlug) {
+                    mainContainer.innerHTML = standingsCache[lSlug];
+                    currentLoadedStandingsKey = lSlug;
+                }
+                return;
+            }
+
             mainContainer.innerHTML = "<div style='text-align:center; color:#94a3b8; padding:30px;'>Carregando classificação e chaveamentos...</div>";
 
             let isCup = lSlug.includes('copa_brasil') || lSlug.includes('libertadores') || lSlug.includes('sudamericana') || lSlug.includes('champions') || lSlug.includes('europa') || lSlug.includes('friendly');
@@ -471,10 +483,13 @@ dashboard_html = """
                         let html = `<h3 style="color:#38bdf8; margin-bottom:10px;">🏆 Chaveamento & Confrontos (Mata-Mata) - ${leagueTitle}</h3>`;
                         
                         if (events.length === 0) {
-                            mainContainer.innerHTML = `
+                            html = `
                                 <h3 style="color:#38bdf8; margin-bottom:10px;">🏆 Chaveamento & Confrontos (Mata-Mata) - ${leagueTitle}</h3>
                                 <div style='text-align:center; color:#94a3b8; padding:30px;'>Nenhum confronto de mata-mata encontrado no momento para este campeonato.</div>
                             `;
+                            standingsCache[lSlug] = html;
+                            mainContainer.innerHTML = html;
+                            currentLoadedStandingsKey = lSlug;
                             return;
                         }
 
@@ -525,7 +540,9 @@ dashboard_html = """
                             html += `</div></div>`;
                         }
                         html += `</div>`;
+                        standingsCache[lSlug] = html;
                         mainContainer.innerHTML = html;
+                        currentLoadedStandingsKey = lSlug;
                         return;
                     }
                 } catch(e) {}
@@ -534,7 +551,8 @@ dashboard_html = """
             try {
                 let res = await fetch(`https://site.api.espn.com/apis/v2/sports/soccer/${lSlug}/standings`);
                 if (!res.ok) {
-                    mainContainer.innerHTML = "<div style='text-align:center; color:#94a3b8; padding:30px;'>Classificação indisponível para esta liga no momento.</div>";
+                    let errHtml = "<div style='text-align:center; color:#94a3b8; padding:30px;'>Classificação indisponível para esta liga no momento.</div>";
+                    mainContainer.innerHTML = errHtml;
                     return;
                 }
                 let data = await res.json();
@@ -549,7 +567,8 @@ dashboard_html = """
                 }
 
                 if (standingsGroups.length === 0) {
-                    mainContainer.innerHTML = "<div style='text-align:center; color:#94a3b8; padding:30px;'>Nenhuma tabela encontrada para este campeonato.</div>";
+                    let errHtml = "<div style='text-align:center; color:#94a3b8; padding:30px;'>Nenhuma tabela encontrada para este campeonato.</div>";
+                    mainContainer.innerHTML = errHtml;
                     return;
                 }
 
@@ -612,7 +631,9 @@ dashboard_html = """
                     }
                     html += `</tbody></table>`;
                 }
+                standingsCache[lSlug] = html;
                 mainContainer.innerHTML = html;
+                currentLoadedStandingsKey = lSlug;
             } catch(e) {
                 mainContainer.innerHTML = "<div style='text-align:center; color:#94a3b8; padding:30px;'>Erro ao carregar a classificação.</div>";
             }
@@ -630,7 +651,7 @@ dashboard_html = """
                     pollInterval = null;
                 }
                 await fetchStandings();
-                return;
+                return; // INTERROMPE COMPLETAMENTE QUALQUER LOOP OU RECARREGAMENTO DE PARTIDAS
             } else {
                 searchContainer.style.display = 'block';
                 if (!pollInterval) {
@@ -907,7 +928,10 @@ dashboard_html = """
         }
 
         document.getElementById('viewSelect').addEventListener('change', fetchAllData);
-        document.getElementById('leagueSelect').addEventListener('change', fetchAllData);
+        document.getElementById('leagueSelect').addEventListener('change', () => {
+            currentLoadedStandingsKey = ""; // Força atualização limpa caso mude a liga na aba de classificação
+            fetchAllData();
+        });
         document.getElementById('searchInput').addEventListener('input', fetchAllData);
 
         fetchAllData();
