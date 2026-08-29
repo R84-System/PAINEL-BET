@@ -260,6 +260,32 @@ dashboard_html = """
             margin-top: 8px;
             gap: 10px;
         }
+        .standings-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #1e293b;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid #334155;
+            margin-top: 15px;
+        }
+        .standings-table th, .standings-table td {
+            padding: 10px 12px;
+            text-align: center;
+            font-size: 13px;
+        }
+        .standings-table th {
+            background-color: #0f172a;
+            color: #38bdf8;
+            font-weight: bold;
+        }
+        .standings-table tr:nth-child(even) {
+            background-color: #162032;
+        }
+        .standings-table td:nth-child(2) {
+            text-align: left;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -268,16 +294,24 @@ dashboard_html = """
         ⚽ Painel Pro de Futebol ao Vivo
     </h2>
 
+    <!-- ALERTA DE GOL EM TEMPO REAL NO TOPO -->
     <div id="topGoalAlert" class="top-goal-banner"></div>
 
     <div class="ticker-bar" id="tickerContainer" style="display:none;">
-        <div class="ticker-title">🟢 AO VIVO (GLOBAL) - PLACAR EM TEMPO REAL</div>
+        <div class="ticker-title">🟢 TICKER AO VIVO (GLOBAL) - PLACAR EM TEMPO REAL</div>
         <div class="ticker-wrap">
             <div class="ticker-move" id="tickerContent"></div>
         </div>
     </div>
 
     <div class="controls">
+        <div>
+            <label style="font-size:12px; color:#94a3b8; display:block; margin-bottom:4px;">Visualização</label>
+            <select id="viewSelect">
+                <option value="matches">⚽ Partidas & Jogos</option>
+                <option value="standings">📊 Classificação & Chaveamentos</option>
+            </select>
+        </div>
         <div>
             <label style="font-size:12px; color:#94a3b8; display:block; margin-bottom:4px;">Campeonato</label>
             <select id="leagueSelect">
@@ -306,9 +340,9 @@ dashboard_html = """
                 <option value="fifa.friendly">🌍 Jogos Internacionais</option>
             </select>
         </div>
-        <div style="flex-grow: 1;">
+        <div style="flex-grow: 1;" id="searchContainer">
             <label style="font-size:12px; color:#94a3b8; display:block; margin-bottom:4px;">Buscar Time</label>
-            <input type="text" id="searchInput" placeholder="Digite aqui">
+            <input type="text" id="searchInput" placeholder="Ex: Flamengo, Real Madrid, Goiás...">
         </div>
     </div>
 
@@ -329,7 +363,6 @@ dashboard_html = """
         let previousScores = {};
         let summariesCache = {};
         let openStates = {};
-        let lastGoalNotification = "";
         let goalAlertTimer = null;
 
         function formatDateBrasilia(dateStr) {
@@ -402,10 +435,107 @@ dashboard_html = """
             if (goalAlertTimer) clearTimeout(goalAlertTimer);
             goalAlertTimer = setTimeout(() => {
                 banner.style.display = "none";
-            }, 12000); // Fica visível por 12 segundos no topo
+            }, 12000);
+        }
+
+        async function fetchStandings() {
+            let selectedLeague = document.getElementById('leagueSelect').value;
+            let lSlug = selectedLeague === 'all_live' ? 'bra.1' : selectedLeague;
+            let mainContainer = document.getElementById('mainContainer');
+            mainContainer.innerHTML = "<div style='text-align:center; color:#94a3b8; padding:30px;'>Carregando tabela de classificação...</div>";
+
+            try {
+                let res = await fetch(`https://site.api.espn.com/apis/v2/sports/soccer/${lSlug}/standings`);
+                if (!res.ok) {
+                    mainContainer.innerHTML = "<div style='text-align:center; color:#94a3b8; padding:30px;'>Classificação indisponível para esta liga no momento.</div>";
+                    return;
+                }
+                let data = await res.json();
+                let standingsGroups = data.standings || [];
+
+                if (standingsGroups.length === 0) {
+                    mainContainer.innerHTML = "<div style='text-align:center; color:#94a3b8; padding:30px;'>Nenhuma tabela encontrada para este campeonato.</div>";
+                    return;
+                }
+
+                let html = `<h3 style="color:#38bdf8; margin-bottom:10px;">📊 Classificação - ${LEAGUES[lSlug] || lSlug}</h3>`;
+
+                for (let group of standingsGroups) {
+                    let entries = group.entries || [];
+                    if (entries.length === 0) continue;
+
+                    html += `
+                        <div style="font-weight:bold; color:#facc15; margin-top:15px; margin-bottom:5px;">${group.name || 'Tabela Principal'}</div>
+                        <table class="standings-table">
+                            <thead>
+                                <tr>
+                                    <th>Pos</th>
+                                    <th>Time</th>
+                                    <th>P</th>
+                                    <th>J</th>
+                                    <th>V</th>
+                                    <th>E</th>
+                                    <th>D</th>
+                                    <th>GP</th>
+                                    <th>GC</th>
+                                    <th>SG</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                    `;
+
+                    for (let entry of entries) {
+                        let stats = {};
+                        for (let stat of (entry.stats || [])) {
+                            stats[stat.name] = stat.displayValue;
+                        }
+                        let teamName = entry.team.displayName || entry.team.name;
+                        let pos = stats.rank || '-';
+                        let pts = stats.points || '0';
+                        let p = stats.gamesPlayed || '0';
+                        let w = stats.wins || '0';
+                        let d = stats.ties || '0';
+                        let l = stats.losses || '0';
+                        let gf = stats.pointsFor || '0';
+                        let ga = stats.pointsAgainst || '0';
+                        let gd = stats.pointDifferential || '0';
+
+                        html += `
+                            <tr>
+                                <td><b>${pos}</b></td>
+                                <td>${teamName}</td>
+                                <td><b>${pts}</b></td>
+                                <td>${p}</td>
+                                <td>${w}</td>
+                                <td>${d}</td>
+                                <td>${l}</td>
+                                <td>${gf}</td>
+                                <td>${ga}</td>
+                                <td>${gd}</td>
+                            </tr>
+                        `;
+                    }
+                    html += `</tbody></table>`;
+                }
+                mainContainer.innerHTML = html;
+            } catch(e) {
+                mainContainer.innerHTML = "<div style='text-align:center; color:#94a3b8; padding:30px;'>Erro ao carregar a classificação.</div>";
+            }
         }
 
         async function fetchAllData() {
+            let viewMode = document.getElementById('viewSelect').value;
+            let searchContainer = document.getElementById('searchContainer');
+            
+            if (viewMode === 'standings') {
+                searchContainer.style.display = 'none';
+                document.getElementById('tickerContainer').style.display = 'none';
+                await fetchStandings();
+                return;
+            } else {
+                searchContainer.style.display = 'block';
+            }
+
             let selectedLeague = document.getElementById('leagueSelect').value;
             let searchQuery = document.getElementById('searchInput').value.toLowerCase().trim();
             
@@ -478,7 +608,6 @@ dashboard_html = """
 
                 let summary = summariesCache[`${lSlug}_${eventId}`] || {};
 
-                // Processamento de Gols e Cartões
                 let hYellowCount = 0, aYellowCount = 0;
                 let hRedCount = 0, aRedCount = 0;
                 let hGoalsList = [];
@@ -514,7 +643,6 @@ dashboard_html = """
                         if (isAway) aRedCount++;
                     }
                     
-                    // Detecção ampliada para incluir gols e pênaltis (penalty - scored)
                     let isGoal = text.includes("goal") || text.includes("gol") || text.includes("penalty") || text.includes("pênalti") || text.includes("penal") || typeName.includes("goal") || typeName.includes("penalty") || d.scoringPlay === true;
                     
                     if (isGoal) {
@@ -540,17 +668,20 @@ dashboard_html = """
                 let isGoalAlert = false;
                 if (previousScores[matchKey] && previousScores[matchKey] !== scoreKey) {
                     isGoalAlert = true;
-                    // Identifica quem marcou o gol para o Alerta do Topo
                     let lastScorerInfo = "";
                     let [prevH, prevA] = previousScores[matchKey].split('-').map(Number);
                     let curH = parseInt(homeScore), curA = parseInt(awayScore);
-                    if (curH > prevH && hGoalsList.length > 0) {
-                        lastScorerInfo = `${homeTeam} ${homeScore} x ${awayScore} - Autor: ${hGoalsList[hGoalsList.length - 1].replace(/<\/?[^>]+(>|$)/g, "")}`;
-                    } else if (curA > prevA && aGoalsList.length > 0) {
-                        lastScorerInfo = `${awayTeam} ${homeScore} x ${awayScore} - Autor: ${aGoalsList[aGoalsList.length - 1].replace(/<\/?[^>]+(>|$)/g, "")}`;
+                    
+                    if (curH > prevH) {
+                        let scName = hGoalsList.length > 0 ? hGoalsList[hGoalsList.length - 1].replace(/<\/?[^>]+(>|$)/g, "") : "Gol";
+                        lastScorerInfo = `Gol do ${homeTeam} ${homeScore} x ${awayScore} ${awayTeam} - Autor: ${scName}`;
+                    } else if (curA > prevA) {
+                        let scName = aGoalsList.length > 0 ? aGoalsList[aGoalsList.length - 1].replace(/<\/?[^>]+(>|$)/g, "") : "Gol";
+                        lastScorerInfo = `Gol do ${awayTeam} ${homeScore} x ${awayScore} ${homeTeam} - Autor: ${scName}`;
                     } else {
                         let scTeam = curH > prevH ? homeTeam : awayTeam;
-                        lastScorerInfo = `${scTeam} marcou! Placar: ${homeScore} x ${awayScore}`;
+                        let advTeam = curH > prevH ? awayTeam : homeTeam;
+                        lastScorerInfo = `Gol do ${scTeam} ${homeScore} x ${awayScore} ${advTeam}`;
                     }
                     triggerTopGoalAlert(lastScorerInfo);
                 }
@@ -683,6 +814,7 @@ dashboard_html = """
             mainContainer.innerHTML = html;
         }
 
+        document.getElementById('viewSelect').addEventListener('change', fetchAllData);
         document.getElementById('leagueSelect').addEventListener('change', fetchAllData);
         document.getElementById('searchInput').addEventListener('input', fetchAllData);
 
