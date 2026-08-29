@@ -306,7 +306,6 @@ dashboard_html = """
         ⚽ Painel Pro de Futebol ao Vivo
     </h2>
 
-    <!-- ALERTA DE GOL NO TOPO FORMATADO EXATAMENTE COMO SOLICITADO -->
     <div id="topGoalAlert" class="top-goal-banner"></div>
 
     <div class="ticker-bar" id="tickerContainer" style="display:none;">
@@ -445,7 +444,6 @@ dashboard_html = """
         function triggerTopGoalAlert(scoringTeam, scorerName, hTeam, aTeam, hScore, aScore) {
             let banner = document.getElementById('topGoalAlert');
             if (!banner) return;
-            // ALERTA DE GOL EXATAMENTE COMO SOLICITADO: Destaque time e quem marcou, abaixo o placar
             banner.innerHTML = `⚽ GOL DO <b>${scoringTeam.toUpperCase()}</b><br>Autor: <b>${scorerName}</b><br><span style="font-size:14px; color:#facc15;">${hTeam} ${hScore} x ${aScore} ${aTeam}</span>`;
             banner.style.display = "block";
             if (goalAlertTimer) clearTimeout(goalAlertTimer);
@@ -459,7 +457,6 @@ dashboard_html = """
             let lSlug = selectedLeague === 'all_live' ? 'bra.1' : selectedLeague;
             let mainContainer = document.getElementById('mainContainer');
 
-            // Se já temos em cache para esta liga, exibe instantaneamente sem piscar / recarregar
             if (standingsCache[lSlug]) {
                 if (currentLoadedStandingsKey !== lSlug) {
                     mainContainer.innerHTML = standingsCache[lSlug];
@@ -651,7 +648,7 @@ dashboard_html = """
                     pollInterval = null;
                 }
                 await fetchStandings();
-                return; // INTERROMPE COMPLETAMENTE QUALQUER LOOP OU RECARREGAMENTO DE PARTIDAS
+                return;
             } else {
                 searchContainer.style.display = 'block';
                 if (!pollInterval) {
@@ -735,6 +732,8 @@ dashboard_html = """
                 let hRedCount = 0, aRedCount = 0;
                 let hGoalsList = [];
                 let aGoalsList = [];
+                let hRedCardsList = [];
+                let aRedCardsList = [];
 
                 let allDetails = [];
                 if (competition.details) allDetails = allDetails.concat(competition.details);
@@ -764,6 +763,18 @@ dashboard_html = """
                     if (text.includes("red card") || text.includes("cartão vermelho") || typeName.includes("red") || typeName.includes("redcard")) {
                         if (isHome) hRedCount++;
                         if (isAway) aRedCount++;
+
+                        let player = "Jogador";
+                        if (d.athlete && d.athlete.displayName) player = d.athlete.displayName;
+                        else if (d.athletesInvolved && d.athletesInvolved[0] && d.athletesInvolved[0].displayName) player = d.athletesInvolved[0].displayName;
+
+                        let clockVal = (d.clock && d.clock.displayValue) ? d.clock.displayValue : "";
+                        let redStr = `🟥 <b>${player}</b> ${clockVal ? '(' + clockVal + "')" : ''}`;
+                        if (isHome) {
+                            if (!hRedCardsList.includes(redStr)) hRedCardsList.push(redStr);
+                        } else if (isAway) {
+                            if (!aRedCardsList.includes(redStr)) aRedCardsList.push(redStr);
+                        }
                     }
                     
                     let isGoal = text.includes("goal") || text.includes("gol") || text.includes("penalty") || text.includes("pênalti") || text.includes("penal") || typeName.includes("goal") || typeName.includes("penalty") || d.scoringPlay === true;
@@ -841,7 +852,10 @@ dashboard_html = """
                 let getBarLabel = (pct) => pct >= 65 ? "🔥 Pressão Alta" : (pct >= 35 ? "⚖️ Neutro" : "🛡️ Defensiva / Baixa");
 
                 let hGoalsHtml = hGoalsList.length > 0 ? `<div style="text-align:right; font-size:11px; color:#facc15; margin-bottom:4px;">${hGoalsList.join("<br>")}</div>` : '';
+                let hRedCardsHtml = hRedCardsList.length > 0 ? `<div style="text-align:right; font-size:11px; color:#ef4444; margin-bottom:4px;">${hRedCardsList.join("<br>")}</div>` : '';
+
                 let aGoalsHtml = aGoalsList.length > 0 ? `<div style="text-align:left; font-size:11px; color:#facc15; margin-bottom:4px;">${aGoalsList.join("<br>")}</div>` : '';
+                let aRedCardsHtml = aRedCardsList.length > 0 ? `<div style="text-align:left; font-size:11px; color:#ef4444; margin-bottom:4px;">${aRedCardsList.join("<br>")}</div>` : '';
 
                 let centerBadge = "";
                 let isHalftime = (statusName === 'STATUS_HALFTIME' || rawDetail.toLowerCase().includes('halftime') || rawDetail.toLowerCase().includes('intervalo'));
@@ -895,6 +909,7 @@ dashboard_html = """
                         <div class="match-grid">
                             <div>
                                 ${hGoalsHtml}
+                                ${hRedCardsHtml}
                                 <div class="team-home">${homeTeam}</div>
                                 <div style="text-align:right; margin-top:6px;">
                                     <span class="pressure-label" style="color: ${getBarColor(hPct)};">${getBarLabel(hPct)} (${hPct}%)</span>
@@ -906,6 +921,7 @@ dashboard_html = """
                             </div>
                             <div>
                                 ${aGoalsHtml}
+                                ${aRedCardsHtml}
                                 <div class="team-away">${awayTeam}</div>
                                 <div style="text-align:left; margin-top:6px;">
                                     <span class="pressure-label" style="color: ${getBarColor(aPct)};">${getBarLabel(aPct)} (${aPct}%)</span>
@@ -929,7 +945,7 @@ dashboard_html = """
 
         document.getElementById('viewSelect').addEventListener('change', fetchAllData);
         document.getElementById('leagueSelect').addEventListener('change', () => {
-            currentLoadedStandingsKey = ""; // Força atualização limpa caso mude a liga na aba de classificação
+            currentLoadedStandingsKey = "";
             fetchAllData();
         });
         document.getElementById('searchInput').addEventListener('input', fetchAllData);
