@@ -308,7 +308,7 @@ dashboard_html = """
         </div>
         <div style="flex-grow: 1;">
             <label style="font-size:12px; color:#94a3b8; display:block; margin-bottom:4px;">Buscar Time</label>
-            <input type="text" id="searchInput" placeholder="digite aqui">
+            <input type="text" id="searchInput" placeholder="Digite aqui">
         </div>
     </div>
 
