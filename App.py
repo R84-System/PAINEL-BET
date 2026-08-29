@@ -286,6 +286,45 @@ dashboard_html = """
             text-align: left;
             font-weight: bold;
         }
+        
+        /* Estilos para Chaveamento em Árvore (Mata-Mata) */
+        .bracket-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            margin-top: 15px;
+        }
+        .bracket-round-title {
+            background: #0f172a;
+            color: #facc15;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 14px;
+            border-left: 4px solid #facc15;
+            margin-bottom: 10px;
+        }
+        .bracket-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 12px;
+        }
+        .bracket-match-card {
+            background: #162032;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 12px;
+            position: relative;
+        }
+        .bracket-match-card::after {
+            content: '';
+            position: absolute;
+            right: -12px;
+            top: 50%;
+            width: 12px;
+            height: 2px;
+            background: #334155;
+        }
     </style>
 </head>
 <body>
@@ -294,6 +333,7 @@ dashboard_html = """
         ⚽ Painel Pro de Futebol ao Vivo
     </h2>
 
+    <!-- ALERTA DE GOL EM TEMPO REAL NO TOPO -->
     <div id="topGoalAlert" class="top-goal-banner"></div>
 
     <div class="ticker-bar" id="tickerContainer" style="display:none;">
@@ -363,6 +403,7 @@ dashboard_html = """
         let summariesCache = {};
         let openStates = {};
         let goalAlertTimer = null;
+        let pollInterval = null;
 
         function formatDateBrasilia(dateStr) {
             if (!dateStr) return "Em breve";
@@ -451,42 +492,64 @@ dashboard_html = """
                     if (res.ok) {
                         let data = await res.json();
                         let events = data.events || [];
-                        let html = `<h3 style="color:#38bdf8; margin-bottom:10px;">🏆 Chaveamento & Jogos (Mata-Mata) - ${LEAGUES[lSlug] || lSlug}</h3>`;
+                        let leagueTitle = LEAGUES[lSlug] || lSlug;
+                        
+                        let html = `<h3 style="color:#38bdf8; margin-bottom:10px;">🏆 Chaveamento & Confrontos (Mata-Mata) - ${leagueTitle}</h3>`;
                         
                         if (events.length === 0) {
-                            mainContainer.innerHTML = `<h3 style="color:#38bdf8; margin-bottom:10px;">🏆 Chaveamento & Jogos (Mata-Mata) - ${LEAGUES[lSlug] || lSlug}</h3><div style='text-align:center; color:#94a3b8; padding:30px;'>Nenhum confronto de mata-mata encontrado no momento para este campeonato.</div>`;
+                            mainContainer.innerHTML = `
+                                <h3 style="color:#38bdf8; margin-bottom:10px;">🏆 Chaveamento & Confrontos (Mata-Mata) - ${leagueTitle}</h3>
+                                <div style='text-align:center; color:#94a3b8; padding:30px;'>Nenhum confronto de mata-mata encontrado no momento para este campeonato.</div>
+                            `;
                             return;
                         }
 
-                        html += `<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 15px; margin-top: 15px;">`;
+                        // Agrupar confrontos por fases/rounds
+                        let roundsMap = {};
                         for (let ev of events) {
                             let comp = ev.competitions[0];
-                            let statusType = comp.status.type.name;
-                            let statusDetail = comp.status.type.detail || comp.status.type.description || "";
-                            let hTeam = "Casa", aTeam = "Fora", hScore = "0", aScore = "0";
-                            for (let c of comp.competitors) {
-                                if (c.homeAway === 'home') {
-                                    hTeam = c.team.displayName;
-                                    hScore = c.score;
-                                } else {
-                                    aTeam = c.team.displayName;
-                                    aScore = c.score;
-                                }
-                            }
-                            let dateStr = formatDateBrasilia(ev.date);
-                            let roundName = comp.tournament?.name || "Mata-Mata / Finais";
+                            let roundName = comp.season?.type?.name || comp.tournament?.name || "Fase Eliminatória";
+                            if (comp.type && comp.type.text) roundName = comp.type.text;
+                            if (!roundsMap[roundName]) roundsMap[roundName] = [];
+                            roundsMap[roundName].push({ ev, comp });
+                        }
 
+                        html += `<div class="bracket-container">`;
+                        for (let [rName, matchesList] of Object.entries(roundsMap)) {
                             html += `
-                                <div class="card" style="margin-bottom:0;">
-                                    <div style="font-size:11px; color:#facc15; font-weight:bold; margin-bottom:6px;">📌 ${roundName} (${dateStr})</div>
-                                    <div style="display:flex; justify-content:space-between; align-items:center; font-size:15px; font-weight:bold;">
-                                        <span style="flex:1; text-align:right;">${hTeam}</span>
-                                        <span style="background:#0f172a; padding:4px 12px; border-radius:6px; margin:0 10px; border:1px solid #334155;">${hScore} x ${aScore}</span>
-                                        <span style="flex:1; text-align:left;">${aTeam}</span>
-                                    </div>
-                                    <div style="text-align:center; font-size:11px; color:#94a3b8; margin-top:6px;">Status: ${statusDetail || statusType}</div>
-                                </div>
+                                <div>
+                                    <div class="bracket-round-title">📌 ${rName}</div>
+                                    <div class="bracket-grid">
                             `;
+                            for (let item of matchesList) {
+                                let ev = item.ev;
+                                let comp = item.comp;
+                                let hTeam = "Casa", aTeam = "Fora", hScore = "0", aScore = "0";
+                                for (let c of comp.competitors) {
+                                    if (c.homeAway === 'home') {
+                                        hTeam = c.team.displayName || c.team.shortDisplayName;
+                                        hScore = c.score;
+                                    } else {
+                                        aTeam = c.team.displayName || c.team.shortDisplayName;
+                                        aScore = c.score;
+                                    }
+                                }
+                                let dateStr = formatDateBrasilia(ev.date);
+                                let statusDetail = comp.status.type.detail || comp.status.type.description || comp.status.type.name;
+
+                                html += `
+                                    <div class="bracket-match-card">
+                                        <div style="font-size:10px; color:#94a3b8; margin-bottom:4px;">📅 ${dateStr}</div>
+                                        <div style="display:flex; justify-content:space-between; align-items:center; font-size:14px; font-weight:bold; margin:6px 0;">
+                                            <span style="flex:1; text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${hTeam}">${hTeam}</span>
+                                            <span style="background:#0f172a; padding:3px 8px; border-radius:4px; margin:0 8px; border:1px solid #334155; font-size:13px;">${hScore} x ${aScore}</span>
+                                            <span style="flex:1; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${aTeam}">${aTeam}</span>
+                                        </div>
+                                        <div style="text-align:center; font-size:10px; color:#38bdf8; margin-top:4px;">${statusDetail}</div>
+                                    </div>
+                                `;
+                            }
+                            html += `</div></div>`;
                         }
                         html += `</div>`;
                         mainContainer.innerHTML = html;
@@ -589,10 +652,15 @@ dashboard_html = """
             if (viewMode === 'standings') {
                 searchContainer.style.display = 'none';
                 document.getElementById('tickerContainer').style.display = 'none';
+                if (pollInterval) clearInterval(pollInterval);
                 await fetchStandings();
                 return;
             } else {
                 searchContainer.style.display = 'block';
+                // Garante o polling apenas para a aba de partidas ao vivo/jogos
+                if (!pollInterval) {
+                    pollInterval = setInterval(fetchAllData, 5000);
+                }
             }
 
             let selectedLeague = document.getElementById('leagueSelect').value;
@@ -878,7 +946,7 @@ dashboard_html = """
         document.getElementById('searchInput').addEventListener('input', fetchAllData);
 
         fetchAllData();
-        setInterval(fetchAllData, 2000);
+        pollInterval = setInterval(fetchAllData, 5000);
     </script>
 </body>
 </html>
