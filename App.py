@@ -4,7 +4,6 @@ st.set_page_config(
     page_title="Painel Pro de Futebol", page_icon="⚽", layout="wide"
 )
 
-# Remove as margens e o topo padrão do Streamlit para aproveitar 100% da tela
 st.markdown(
     """
     <style>
@@ -396,6 +395,36 @@ dashboard_html = """
         let pollInterval = null;
         let currentLoadedStandingsKey = "";
 
+        // Função que gera som de alerta de gol automaticamente (Toque Festivo/Corneta)
+        function playGoalSound() {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContext) return;
+                const ctx = new AudioContext();
+                
+                // Sequência de notas sonoras com sintetizador do navegador
+                let notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+                let now = ctx.currentTime;
+                
+                notes.forEach((freq, index) => {
+                    let osc = ctx.createOscillator();
+                    let gain = ctx.createGain();
+                    
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(freq, now + (index * 0.12));
+                    
+                    gain.gain.setValueAtTime(0.3, now + (index * 0.12));
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + (index * 0.12) + 0.3);
+                    
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    
+                    osc.start(now + (index * 0.12));
+                    osc.stop(now + (index * 0.12) + 0.3);
+                });
+            } catch(e) {}
+        }
+
         function formatDateBrasilia(dateStr) {
             if (!dateStr) return "Em breve";
             try {
@@ -424,7 +453,6 @@ dashboard_html = """
 
         async function asyncizedFetchSummary(slug, eventId, isLive = false) {
             let key = `${slug}_${eventId}`;
-            // Se estiver ao vivo, ignoramos o cache permanente para buscar as estatísticas em tempo real a cada ciclo!
             if (!isLive && summariesCache[key]) return summariesCache[key];
             try {
                 let res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${slug}/summary?event=${eventId}`);
@@ -494,6 +522,10 @@ dashboard_html = """
             if (!banner) return;
             banner.innerHTML = `⚽ GOL DO <b>${scoringTeam.toUpperCase()}</b><br>Autor: <b>${scorerName}</b><br><span style="font-size:13px; color:#facc15;">${hTeam} ${hScore} x ${aScore} ${aTeam}</span>`;
             banner.style.display = "block";
+            
+            // Toca o som de gol automaticamente
+            playGoalSound();
+
             if (goalAlertTimer) clearTimeout(goalAlertTimer);
             goalAlertTimer = setTimeout(() => {
                 banner.style.display = "none";
@@ -709,7 +741,6 @@ dashboard_html = """
             } else {
                 searchContainer.style.display = 'block';
                 if (!pollInterval) {
-                    // Atualização extremamente rápida a cada 2 segundos (2000ms) para manter estatísticas e termômetro em tempo real
                     pollInterval = setInterval(fetchAllData, 2000);
                 }
             }
@@ -762,7 +793,6 @@ dashboard_html = """
                 } catch(e) {}
             }
 
-            // Busca os resumos garantindo atualização em tempo real para jogos ao vivo
             for (let item of matchesToDisplay) {
                 let state = item.event.competitions[0].status.type.state;
                 let isLiveMatch = (state === 'in' || item.event.competitions[0].status.type.name === 'STATUS_HALFTIME');
