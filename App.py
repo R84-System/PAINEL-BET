@@ -37,6 +37,13 @@ dashboard_html = """
             background-color: #0e1117;
             color: #fafafa;
         }
+        .sticky-header-container {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            background-color: #0e1117;
+            padding-bottom: 6px;
+        }
         @keyframes blink {
             0% { opacity: 1; transform: scale(1); }
             50% { opacity: 0.3; transform: scale(0.95); }
@@ -63,7 +70,7 @@ dashboard_html = """
             color: #fff;
             padding: 12px 18px;
             border-radius: 8px;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             text-align: center;
             font-size: 14px;
             font-weight: bold;
@@ -187,14 +194,15 @@ dashboard_html = """
             transition: width 0.3s ease;
         }
         .controls {
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
-            background: #1e293b;
+            background: #1e3a8a;
             padding: 10px;
             border-radius: 8px;
-            border: 1px solid #334155;
+            border: 1px solid #3b82f6;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         }
         .controls select, .controls input {
             background: #0f172a;
@@ -213,7 +221,7 @@ dashboard_html = """
             padding: 6px 10px;
             border-radius: 6px;
             border: 1px solid #334155;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             overflow: hidden;
         }
         .ticker-title {
@@ -317,58 +325,60 @@ dashboard_html = """
 </head>
 <body>
 
-    <h3 style="margin-top:0; margin-bottom:8px; display:flex; align-items:center; gap:8px; font-size: 18px;">
-        ⚽ Painel Pro de Futebol ao Vivo
-    </h3>
+    <div class="sticky-header-container">
+        <h3 style="margin-top:0; margin-bottom:6px; display:flex; align-items:center; gap:8px; font-size: 18px;">
+            ⚽ Painel Pro de Futebol ao Vivo
+        </h3>
 
-    <div id="topGoalAlert" class="top-goal-banner"></div>
+        <div id="topGoalAlert" class="top-goal-banner"></div>
 
-    <div class="ticker-bar" id="tickerContainer" style="display:none;">
-        <div class="ticker-title">🟢 TICKER AO VIVO (GLOBAL) - PLACAR EM TEMPO REAL</div>
-        <div class="ticker-wrap">
-            <div class="ticker-move" id="tickerContent"></div>
+        <div class="ticker-bar" id="tickerContainer" style="display:none;">
+            <div class="ticker-title">🟢 TICKER AO VIVO (GLOBAL) - PLACAR EM TEMPO REAL</div>
+            <div class="ticker-wrap">
+                <div class="ticker-move" id="tickerContent"></div>
+            </div>
         </div>
-    </div>
 
-    <div class="controls">
-        <div>
-            <label style="font-size:11px; color:#94a3b8; display:block; margin-bottom:2px;">Visualização</label>
-            <select id="viewSelect">
-                <option value="matches">⚽ Partidas & Jogos</option>
-                <option value="standings">📊 Classificação & Chaveamentos</option>
-            </select>
-        </div>
-        <div>
-            <label style="font-size:11px; color:#94a3b8; display:block; margin-bottom:2px;">Campeonato</label>
-            <select id="leagueSelect">
-                <option value="all_live">🟢 Todos os Jogos ao Vivo (Global)</option>
-                <option value="bra.1">🇧🇷 Brasileirão Série A</option>
-                <option value="bra.2">🇧🇷 Brasileirão Série B</option>
-                <option value="bra.copa_brasil">🇧🇷 Copa do Brasil</option>
-                <option value="conmebol.libertadores">🌎 Copa Libertadores</option>
-                <option value="conmebol.sudamericana">🌎 Copa Sudamericana</option>
-                <option value="uefa.champions">🇪🇺 Champions League</option>
-                <option value="uefa.europa">🇪🇺 Europa League</option>
-                <option value="eng.1">🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League</option>
-                <option value="esp.1">🇪🇸 La Liga</option>
-                <option value="ita.1">🇮🇹 Serie A (Itália)</option>
-                <option value="ger.1">🇩🇪 Bundesliga</option>
-                <option value="fra.1">🇫🇷 Ligue 1</option>
-                <option value="por.1">🇵🇹 Primeira Liga</option>
-                <option value="ksa.1">🇸🇦 Saudi Pro League</option>
-                <option value="arg.1">🇦🇷 Liga Profesional</option>
-                <option value="mex.1">🇲🇽 Liga MX</option>
-                <option value="col.1">🇨🇴 Campeonato Colombiano</option>
-                <option value="ecu.1">🇪🇨 Campeonato do Equador</option>
-                <option value="chi.1">🇨🇱 Liga Chilena</option>
-                <option value="ned.1">🇳🇱 Eredivisie</option>
-                <option value="usa.1">🇺🇸 MLS</option>
-                <option value="fifa.friendly">🌍 Jogos Internacionais</option>
-            </select>
-        </div>
-        <div style="flex-grow: 1;" id="searchContainer">
-            <label style="font-size:11px; color:#94a3b8; display:block; margin-bottom:2px;">Buscar Time</label>
-            <input type="text" id="searchInput" placeholder="Ex: Flamengo, Real Madrid, Grêmio...">
+        <div class="controls">
+            <div>
+                <label style="font-size:11px; color:#93c5fd; display:block; margin-bottom:2px; font-weight:bold;">Visualização</label>
+                <select id="viewSelect">
+                    <option value="matches">⚽ Partidas & Jogos</option>
+                    <option value="standings">📊 Classificação & Chaveamentos</option>
+                </select>
+            </div>
+            <div>
+                <label style="font-size:11px; color:#93c5fd; display:block; margin-bottom:2px; font-weight:bold;">Campeonato</label>
+                <select id="leagueSelect">
+                    <option value="all_live">🟢 Todos os Jogos ao Vivo (Global)</option>
+                    <option value="bra.1">🇧🇷 Brasileirão Série A</option>
+                    <option value="bra.2">🇧🇷 Brasileirão Série B</option>
+                    <option value="bra.copa_brasil">🇧🇷 Copa do Brasil</option>
+                    <option value="conmebol.libertadores">🌎 Copa Libertadores</option>
+                    <option value="conmebol.sudamericana">🌎 Copa Sudamericana</option>
+                    <option value="uefa.champions">🇪🇺 Champions League</option>
+                    <option value="uefa.europa">🇪🇺 Europa League</option>
+                    <option value="eng.1">🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League</option>
+                    <option value="esp.1">🇪🇸 La Liga</option>
+                    <option value="ita.1">🇮🇹 Serie A (Itália)</option>
+                    <option value="ger.1">🇩🇪 Bundesliga</option>
+                    <option value="fra.1">🇫🇷 Ligue 1</option>
+                    <option value="por.1">🇵🇹 Primeira Liga</option>
+                    <option value="ksa.1">🇸🇦 Saudi Pro League</option>
+                    <option value="arg.1">🇦🇷 Liga Profesional</option>
+                    <option value="mex.1">🇲🇽 Liga MX</option>
+                    <option value="col.1">🇨🇴 Campeonato Colombiano</option>
+                    <option value="ecu.1">🇪🇨 Campeonato do Equador</option>
+                    <option value="chi.1">🇨🇱 Liga Chilena</option>
+                    <option value="ned.1">🇳🇱 Eredivisie</option>
+                    <option value="usa.1">🇺🇸 MLS</option>
+                    <option value="fifa.friendly">🌍 Jogos Internacionais</option>
+                </select>
+            </div>
+            <div style="flex-grow: 1;" id="searchContainer">
+                <label style="font-size:11px; color:#93c5fd; display:block; margin-bottom:2px; font-weight:bold;">Buscar Time</label>
+                <input type="text" id="searchInput" placeholder="Ex: Flamengo, Real Madrid, Grêmio...">
+            </div>
         </div>
     </div>
 
