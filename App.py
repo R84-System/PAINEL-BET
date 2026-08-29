@@ -1,10 +1,3 @@
-import streamlit as st
-
-st.set_page_config(
-    page_title="Painel Pro de Futebol", page_icon="⚽", layout="wide"
-)
-
-dashboard_html = """
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -893,8 +886,8 @@ dashboard_html = """
                 let hPct = totalPress === 0 ? 50 : Math.round((hScorePress / totalPress) * 100);
                 let aPct = 100 - hPct;
 
-                let getBarColor = (pct) => pct >= 65 ? "#22c55e" : (pct >= 35 ? "#ffffff" : "#ef4444");
-                let getBarLabel = (pct) => pct >= 65 ? "Pressão Alta" : (pct >= 35 ? "Neutro" : "Defensiva / Baixa");
+                let getBarColor = (pct) => pct > 65 ? "#22c55e" : (pct >= 50 ? "#f97316" : (pct >= 35 ? "#ffffff" : "#ef4444"));
+                let getBarLabel = (pct) => pct > 65 ? "Pressão Alta" : (pct >= 50 ? "Pressão Moderada" : (pct >= 35 ? "Neutro" : "Defensiva / Baixa"));
 
                 let hGoalsHtml = hGoalsList.length > 0 ? `<div style="text-align:right; font-size:11px; color:#facc15; margin-bottom:4px;">${hGoalsList.join("<br>")}</div>` : '';
                 let hRedCardsHtml = hRedCardsList.length > 0 ? `<div style="text-align:right; font-size:11px; color:#facc15; margin-bottom:4px;">${hRedCardsList.join("<br>")}</div>` : '';
@@ -1000,7 +993,3 @@ dashboard_html = """
     </script>
 </body>
 </html>
-"""
-
-st.title("⚽ Painel Pro de Futebol ao Vivo")
-st.components.v1.html(dashboard_html, height=1200, scrolling=True)
