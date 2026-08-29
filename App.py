@@ -47,6 +47,25 @@ dashboard_html = """
             padding: 2px 8px;
             display: inline-block;
         }
+        @keyframes topGoalPulse {
+            0% { background-color: #166534; border-color: #22c55e; transform: scale(1); }
+            50% { background-color: #ca8a04; border-color: #facc15; transform: scale(1.01); }
+            100% { background-color: #166534; border-color: #22c55e; transform: scale(1); }
+        }
+        .top-goal-banner {
+            background-color: #166534;
+            border: 2px solid #22c55e;
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            text-align: center;
+            font-size: 16px;
+            font-weight: bold;
+            animation: topGoalPulse 1.5s infinite ease-in-out;
+            box-shadow: 0 0 20px rgba(34, 197, 94, 0.6);
+            display: none;
+        }
         .card {
             background-color: #1e293b;
             border: 1px solid #334155;
@@ -249,6 +268,8 @@ dashboard_html = """
         ⚽ Painel Pro de Futebol ao Vivo
     </h2>
 
+    <div id="topGoalAlert" class="top-goal-banner"></div>
+
     <div class="ticker-bar" id="tickerContainer" style="display:none;">
         <div class="ticker-title">🟢 TICKER AO VIVO (GLOBAL) - PLACAR EM TEMPO REAL</div>
         <div class="ticker-wrap">
@@ -308,6 +329,8 @@ dashboard_html = """
         let previousScores = {};
         let summariesCache = {};
         let openStates = {};
+        let lastGoalNotification = "";
+        let goalAlertTimer = null;
 
         function formatDateBrasilia(dateStr) {
             if (!dateStr) return "Em breve";
@@ -369,6 +392,17 @@ dashboard_html = """
             } else {
                 tickerContainer.style.display = "none";
             }
+        }
+
+        function triggerTopGoalAlert(message) {
+            let banner = document.getElementById('topGoalAlert');
+            if (!banner) return;
+            banner.innerHTML = `🚨 GOL! ${message}`;
+            banner.style.display = "block";
+            if (goalAlertTimer) clearTimeout(goalAlertTimer);
+            goalAlertTimer = setTimeout(() => {
+                banner.style.display = "none";
+            }, 12000); // Fica visível por 12 segundos no topo
         }
 
         async function fetchAllData() {
@@ -442,55 +476,9 @@ dashboard_html = """
                     }
                 }
 
-                let matchKey = `${eventId}`;
-                let scoreKey = `${homeScore}-${awayScore}`;
-                let isGoalAlert = false;
-                if (previousScores[matchKey] && previousScores[matchKey] !== scoreKey) {
-                    isGoalAlert = true;
-                }
-                previousScores[matchKey] = scoreKey;
-
-                let state = competition.status.type.state;
-                let statusName = competition.status.type.name || "";
-                let rawDetail = competition.status.type.detail || "";
-                let displayClock = competition.status.displayClock || "";
-                let period = competition.status.period || 1;
-                let venueName = competition.venue ? competition.venue.fullName : "Local não informado";
-                let kickoff = formatDateBrasilia(ev.date);
-
                 let summary = summariesCache[`${lSlug}_${eventId}`] || {};
-                
-                let hStats = {}, aStats = {};
-                if (summary.boxscore && summary.boxscore.teams) {
-                    for (let t of summary.boxscore.teams) {
-                        let side = t.homeAway === 'home' ? 'home' : 'away';
-                        for (let s of (t.statistics || [])) {
-                            if (side === 'home') hStats[s.name] = s.displayValue;
-                            else aStats[s.name] = s.displayValue;
-                        }
-                    }
-                }
 
-                let parseNum = (val) => { let n = parseFloat(String(val).replace("%","").trim()); return isNaN(n)?0:n; };
-                let hShotsOn = parseNum(hStats.shotsOnTarget || 0);
-                let hShotsTot = parseNum(hStats.totalShots || 0);
-                let hCorners = parseNum(hStats.wonCorners || 0);
-                let hPoss = parseNum(hStats.possessionPct || 50);
-
-                let aShotsOn = parseNum(aStats.shotsOnTarget || 0);
-                let aShotsTot = parseNum(aStats.totalShots || 0);
-                let aCorners = parseNum(aStats.wonCorners || 0);
-                let aPoss = parseNum(aStats.possessionPct || 50);
-
-                let hScorePress = (hShotsOn * 3.0) + (hShotsTot * 1.0) + (hCorners * 1.5) + (hPoss * 0.2);
-                let aScorePress = (aShotsOn * 3.0) + (aShotsTot * 1.0) + (aCorners * 1.5) + (aPoss * 0.2);
-                let totalPress = hScorePress + aScorePress;
-                let hPct = totalPress === 0 ? 50 : Math.round((hScorePress / totalPress) * 100);
-                let aPct = 100 - hPct;
-
-                let getBarColor = (pct) => pct >= 65 ? "#22c55e" : (pct >= 35 ? "#ffffff" : "#ef4444");
-                let getBarLabel = (pct) => pct >= 65 ? "🔥 Pressão Alta" : (pct >= 35 ? "⚖️ Neutro" : "🛡️ Defensiva / Baixa");
-
+                // Processamento de Gols e Cartões
                 let hYellowCount = 0, aYellowCount = 0;
                 let hRedCount = 0, aRedCount = 0;
                 let hGoalsList = [];
@@ -525,15 +513,20 @@ dashboard_html = """
                         if (isHome) hRedCount++;
                         if (isAway) aRedCount++;
                     }
-                    if (text.includes("goal") || text.includes("gol") || typeName.includes("goal")) {
+                    
+                    // Detecção ampliada para incluir gols e pênaltis (penalty - scored)
+                    let isGoal = text.includes("goal") || text.includes("gol") || text.includes("penalty") || text.includes("pênalti") || text.includes("penal") || typeName.includes("goal") || typeName.includes("penalty") || d.scoringPlay === true;
+                    
+                    if (isGoal) {
                         let scorer = "Gol";
                         if (d.athlete && d.athlete.displayName) scorer = d.athlete.displayName;
                         else if (d.athletesInvolved && d.athletesInvolved[0] && d.athletesInvolved[0].displayName) scorer = d.athletesInvolved[0].displayName;
                         
                         let clockVal = (d.clock && d.clock.displayValue) ? d.clock.displayValue : "";
                         let isOwn = text.includes("own goal") || text.includes("contra");
+                        let isPenalty = text.includes("penalty") || text.includes("pênalti") || text.includes("penal") || typeName.includes("penalty");
                         
-                        let goalStr = `⚽ <b>${scorer}${isOwn ? ' (Contra)' : ''}</b> ${clockVal ? '(' + clockVal + "')" : ''}`;
+                        let goalStr = `⚽ ${isPenalty ? '(Pên) ' : ''}<b>${scorer}${isOwn ? ' (Contra)' : ''}</b> ${clockVal ? '(' + clockVal + "')" : ''}`;
                         if (isHome) {
                             if (!hGoalsList.includes(goalStr)) hGoalsList.push(goalStr);
                         } else if (isAway) {
@@ -541,6 +534,66 @@ dashboard_html = """
                         }
                     }
                 }
+
+                let matchKey = `${eventId}`;
+                let scoreKey = `${homeScore}-${awayScore}`;
+                let isGoalAlert = false;
+                if (previousScores[matchKey] && previousScores[matchKey] !== scoreKey) {
+                    isGoalAlert = true;
+                    // Identifica quem marcou o gol para o Alerta do Topo
+                    let lastScorerInfo = "";
+                    let [prevH, prevA] = previousScores[matchKey].split('-').map(Number);
+                    let curH = parseInt(homeScore), curA = parseInt(awayScore);
+                    if (curH > prevH && hGoalsList.length > 0) {
+                        lastScorerInfo = `${homeTeam} ${homeScore} x ${awayScore} - Autor: ${hGoalsList[hGoalsList.length - 1].replace(/<\/?[^>]+(>|$)/g, "")}`;
+                    } else if (curA > prevA && aGoalsList.length > 0) {
+                        lastScorerInfo = `${awayTeam} ${homeScore} x ${awayScore} - Autor: ${aGoalsList[aGoalsList.length - 1].replace(/<\/?[^>]+(>|$)/g, "")}`;
+                    } else {
+                        let scTeam = curH > prevH ? homeTeam : awayTeam;
+                        lastScorerInfo = `${scTeam} marcou! Placar: ${homeScore} x ${awayScore}`;
+                    }
+                    triggerTopGoalAlert(lastScorerInfo);
+                }
+                previousScores[matchKey] = scoreKey;
+
+                let state = competition.status.type.state;
+                let statusName = competition.status.type.name || "";
+                let rawDetail = competition.status.type.detail || "";
+                let displayClock = competition.status.displayClock || "";
+                let period = competition.status.period || 1;
+                let venueName = competition.venue ? competition.venue.fullName : "Local não informado";
+                let kickoff = formatDateBrasilia(ev.date);
+
+                let hStats = {}, aStats = {};
+                if (summary.boxscore && summary.boxscore.teams) {
+                    for (let t of summary.boxscore.teams) {
+                        let side = t.homeAway === 'home' ? 'home' : 'away';
+                        for (let s of (t.statistics || [])) {
+                            if (side === 'home') hStats[s.name] = s.displayValue;
+                            else aStats[s.name] = s.displayValue;
+                        }
+                    }
+                }
+
+                let parseNum = (val) => { let n = parseFloat(String(val).replace("%","").trim()); return isNaN(n)?0:n; };
+                let hShotsOn = parseNum(hStats.shotsOnTarget || 0);
+                let hShotsTot = parseNum(hStats.totalShots || 0);
+                let hCorners = parseNum(hStats.wonCorners || 0);
+                let hPoss = parseNum(hStats.possessionPct || 50);
+
+                let aShotsOn = parseNum(aStats.shotsOnTarget || 0);
+                let aShotsTot = parseNum(aStats.totalShots || 0);
+                let aCorners = parseNum(aStats.wonCorners || 0);
+                let aPoss = parseNum(aStats.possessionPct || 50);
+
+                let hScorePress = (hShotsOn * 3.0) + (hShotsTot * 1.0) + (hCorners * 1.5) + (hPoss * 0.2);
+                let aScorePress = (aShotsOn * 3.0) + (aShotsTot * 1.0) + (aCorners * 1.5) + (aPoss * 0.2);
+                let totalPress = hScorePress + aScorePress;
+                let hPct = totalPress === 0 ? 50 : Math.round((hScorePress / totalPress) * 100);
+                let aPct = 100 - hPct;
+
+                let getBarColor = (pct) => pct >= 65 ? "#22c55e" : (pct >= 35 ? "#ffffff" : "#ef4444");
+                let getBarLabel = (pct) => pct >= 65 ? "🔥 Pressão Alta" : (pct >= 35 ? "⚖️ Neutro" : "🛡️ Defensiva / Baixa");
 
                 let hGoalsHtml = hGoalsList.length > 0 ? `<div style="text-align:right; font-size:11px; color:#facc15; margin-bottom:4px;">${hGoalsList.join("<br>")}</div>` : '';
                 let aGoalsHtml = aGoalsList.length > 0 ? `<div style="text-align:left; font-size:11px; color:#facc15; margin-bottom:4px;">${aGoalsList.join("<br>")}</div>` : '';
