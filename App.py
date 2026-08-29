@@ -412,12 +412,24 @@ dashboard_html = """
 
         async function updateGlobalTicker() {
             let tickerMatches = [];
+            let yestStr = getDateString(-1);
+            let todayStr = getDateString(0);
+
             for (let lSlug of Object.keys(LEAGUES)) {
                 try {
-                    let res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard`);
-                    if (!res.ok) continue;
-                    let data = await res.json();
-                    let events = data.events || [];
+                    let [resYest, resToday] = await Promise.all([
+                        fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard?dates=${yestStr}`),
+                        fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard?dates=${todayStr}`)
+                    ]);
+
+                    let dataYest = resYest.ok ? await resYest.json() : { events: [] };
+                    let dataToday = resToday.ok ? await resToday.json() : { events: [] };
+
+                    let eventMap = {};
+                    (dataYest.events || []).forEach(ev => eventMap[ev.id] = ev);
+                    (dataToday.events || []).forEach(ev => eventMap[ev.id] = ev);
+                    let events = Object.values(eventMap);
+
                     for (let ev of events) {
                         let comp = ev.competitions[0];
                         let state = comp.status.type.state;
@@ -680,20 +692,24 @@ dashboard_html = """
             let matchesToDisplay = [];
             let leaguesToFetch = selectedLeague === 'all_live' ? Object.keys(LEAGUES) : [selectedLeague];
 
+            let yestStr = getDateString(-1);
             let todayStr = getDateString(0);
             let tomorrowStr = getDateString(1);
 
             for (let lSlug of leaguesToFetch) {
                 try {
-                    let [resToday, resTomorrow] = await Promise.all([
+                    let [resYest, resToday, resTomorrow] = await Promise.all([
+                        fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard?dates=${yestStr}`),
                         fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard?dates=${todayStr}`),
                         fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard?dates=${tomorrowStr}`)
                     ]);
 
+                    let dataYest = resYest.ok ? await resYest.json() : { events: [] };
                     let dataToday = resToday.ok ? await resToday.json() : { events: [] };
                     let dataTomorrow = resTomorrow.ok ? await resTomorrow.json() : { events: [] };
 
                     let eventMap = {};
+                    (dataYest.events || []).forEach(ev => eventMap[ev.id] = ev);
                     (dataToday.events || []).forEach(ev => eventMap[ev.id] = ev);
                     (dataTomorrow.events || []).forEach(ev => eventMap[ev.id] = ev);
                     let events = Object.values(eventMap);
