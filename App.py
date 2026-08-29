@@ -294,7 +294,6 @@ dashboard_html = """
         ⚽ Painel Pro de Futebol ao Vivo
     </h2>
 
-    <!-- ALERTA DE GOL EM TEMPO REAL NO TOPO -->
     <div id="topGoalAlert" class="top-goal-banner"></div>
 
     <div class="ticker-bar" id="tickerContainer" style="display:none;">
@@ -442,7 +441,59 @@ dashboard_html = """
             let selectedLeague = document.getElementById('leagueSelect').value;
             let lSlug = selectedLeague === 'all_live' ? 'bra.1' : selectedLeague;
             let mainContainer = document.getElementById('mainContainer');
-            mainContainer.innerHTML = "<div style='text-align:center; color:#94a3b8; padding:30px;'>Carregando tabela de classificação...</div>";
+            mainContainer.innerHTML = "<div style='text-align:center; color:#94a3b8; padding:30px;'>Carregando classificação e chaveamentos...</div>";
+
+            let isCup = lSlug.includes('copa_brasil') || lSlug.includes('libertadores') || lSlug.includes('sudamericana') || lSlug.includes('champions') || lSlug.includes('europa') || lSlug.includes('friendly');
+
+            if (isCup) {
+                try {
+                    let res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard`);
+                    if (res.ok) {
+                        let data = await res.json();
+                        let events = data.events || [];
+                        let html = `<h3 style="color:#38bdf8; margin-bottom:10px;">🏆 Chaveamento & Jogos (Mata-Mata) - ${LEAGUES[lSlug] || lSlug}</h3>`;
+                        
+                        if (events.length === 0) {
+                            mainContainer.innerHTML = `<h3 style="color:#38bdf8; margin-bottom:10px;">🏆 Chaveamento & Jogos (Mata-Mata) - ${LEAGUES[lSlug] || lSlug}</h3><div style='text-align:center; color:#94a3b8; padding:30px;'>Nenhum confronto de mata-mata encontrado no momento para este campeonato.</div>`;
+                            return;
+                        }
+
+                        html += `<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 15px; margin-top: 15px;">`;
+                        for (let ev of events) {
+                            let comp = ev.competitions[0];
+                            let statusType = comp.status.type.name;
+                            let statusDetail = comp.status.type.detail || comp.status.type.description || "";
+                            let hTeam = "Casa", aTeam = "Fora", hScore = "0", aScore = "0";
+                            for (let c of comp.competitors) {
+                                if (c.homeAway === 'home') {
+                                    hTeam = c.team.displayName;
+                                    hScore = c.score;
+                                } else {
+                                    aTeam = c.team.displayName;
+                                    aScore = c.score;
+                                }
+                            }
+                            let dateStr = formatDateBrasilia(ev.date);
+                            let roundName = comp.tournament?.name || "Mata-Mata / Finais";
+
+                            html += `
+                                <div class="card" style="margin-bottom:0;">
+                                    <div style="font-size:11px; color:#facc15; font-weight:bold; margin-bottom:6px;">📌 ${roundName} (${dateStr})</div>
+                                    <div style="display:flex; justify-content:space-between; align-items:center; font-size:15px; font-weight:bold;">
+                                        <span style="flex:1; text-align:right;">${hTeam}</span>
+                                        <span style="background:#0f172a; padding:4px 12px; border-radius:6px; margin:0 10px; border:1px solid #334155;">${hScore} x ${aScore}</span>
+                                        <span style="flex:1; text-align:left;">${aTeam}</span>
+                                    </div>
+                                    <div style="text-align:center; font-size:11px; color:#94a3b8; margin-top:6px;">Status: ${statusDetail || statusType}</div>
+                                </div>
+                            `;
+                        }
+                        html += `</div>`;
+                        mainContainer.innerHTML = html;
+                        return;
+                    }
+                } catch(e) {}
+            }
 
             try {
                 let res = await fetch(`https://site.api.espn.com/apis/v2/sports/soccer/${lSlug}/standings`);
@@ -452,6 +503,14 @@ dashboard_html = """
                 }
                 let data = await res.json();
                 let standingsGroups = data.standings || [];
+
+                if (standingsGroups.length === 0 && data.children) {
+                    for (let child of data.children) {
+                        if (child.standings) {
+                            standingsGroups = standingsGroups.concat(child.standings);
+                        }
+                    }
+                }
 
                 if (standingsGroups.length === 0) {
                     mainContainer.innerHTML = "<div style='text-align:center; color:#94a3b8; padding:30px;'>Nenhuma tabela encontrada para este campeonato.</div>";
