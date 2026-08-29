@@ -36,17 +36,6 @@ dashboard_html = """
             margin-right: 6px;
             box-shadow: 0 0 8px #22c55e;
         }
-        @keyframes goalFlash {
-            0% { background-color: #22c55e; transform: scale(1.05); color: #000; }
-            50% { background-color: #facc15; transform: scale(1.08); color: #000; }
-            100% { background-color: transparent; transform: scale(1); color: inherit; }
-        }
-        .goal-alert {
-            animation: goalFlash 2s ease-in-out;
-            border-radius: 6px;
-            padding: 2px 8px;
-            display: inline-block;
-        }
         @keyframes topGoalPulse {
             0% { background-color: #166534; border-color: #22c55e; transform: scale(1); }
             50% { background-color: #ca8a04; border-color: #facc15; transform: scale(1.01); }
@@ -56,15 +45,16 @@ dashboard_html = """
             background-color: #166534;
             border: 2px solid #22c55e;
             color: #fff;
-            padding: 12px 20px;
+            padding: 14px 20px;
             border-radius: 10px;
             margin-bottom: 15px;
             text-align: center;
-            font-size: 16px;
+            font-size: 15px;
             font-weight: bold;
             animation: topGoalPulse 1.5s infinite ease-in-out;
             box-shadow: 0 0 20px rgba(34, 197, 94, 0.6);
             display: none;
+            line-height: 1.5;
         }
         .card {
             background-color: #1e293b;
@@ -164,9 +154,6 @@ dashboard_html = """
             font-weight: bold;
             display: inline-block;
         }
-        .pressure-bar-container {
-            margin-top: 6px;
-        }
         .pressure-label {
             font-size: 11px;
             font-weight: bold;
@@ -206,7 +193,6 @@ dashboard_html = """
         .controls input {
             flex-grow: 1;
         }
-        
         .ticker-bar {
             background: #1e293b;
             padding: 8px 12px;
@@ -239,7 +225,6 @@ dashboard_html = """
             0% { transform: translateX(0); }
             100% { transform: translateX(-50%); }
         }
-
         details {
             margin-top: 10px;
             background: #0f172a;
@@ -286,8 +271,7 @@ dashboard_html = """
             text-align: left;
             font-weight: bold;
         }
-        
-        /* Estilos para Chaveamento em Árvore (Mata-Mata) */
+        /* Estilos para Chaveamento em Árvore / Mata-Mata */
         .bracket-container {
             display: flex;
             flex-direction: column;
@@ -306,7 +290,7 @@ dashboard_html = """
         }
         .bracket-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
             gap: 12px;
         }
         .bracket-match-card {
@@ -314,16 +298,6 @@ dashboard_html = """
             border: 1px solid #334155;
             border-radius: 8px;
             padding: 12px;
-            position: relative;
-        }
-        .bracket-match-card::after {
-            content: '';
-            position: absolute;
-            right: -12px;
-            top: 50%;
-            width: 12px;
-            height: 2px;
-            background: #334155;
         }
     </style>
 </head>
@@ -381,7 +355,7 @@ dashboard_html = """
         </div>
         <div style="flex-grow: 1;" id="searchContainer">
             <label style="font-size:12px; color:#94a3b8; display:block; margin-bottom:4px;">Buscar Time</label>
-            <input type="text" id="searchInput" placeholder="Ex: Flamengo, Real Madrid, Goiás...">
+            <input type="text" id="searchInput" placeholder="Ex: Flamengo, Real Madrid, Grêmio...">
         </div>
     </div>
 
@@ -467,10 +441,10 @@ dashboard_html = """
             }
         }
 
-        function triggerTopGoalAlert(message) {
+        function triggerTopGoalAlert(scoringTeam, scorerName, hTeam, aTeam, hScore, aScore) {
             let banner = document.getElementById('topGoalAlert');
             if (!banner) return;
-            banner.innerHTML = `🚨 GOL! ${message}`;
+            banner.innerHTML = `🚨 GOL DO <b>${scoringTeam.toUpperCase()}</b> - Autor: <b>${scorerName}</b><br><span style="font-size:14px; color:#facc15;">${hTeam} ${hScore} x ${aScore} ${aTeam}</span>`;
             banner.style.display = "block";
             if (goalAlertTimer) clearTimeout(goalAlertTimer);
             goalAlertTimer = setTimeout(() => {
@@ -504,7 +478,6 @@ dashboard_html = """
                             return;
                         }
 
-                        // Agrupar confrontos por fases/rounds
                         let roundsMap = {};
                         for (let ev of events) {
                             let comp = ev.competitions[0];
@@ -652,12 +625,14 @@ dashboard_html = """
             if (viewMode === 'standings') {
                 searchContainer.style.display = 'none';
                 document.getElementById('tickerContainer').style.display = 'none';
-                if (pollInterval) clearInterval(pollInterval);
+                if (pollInterval) {
+                    clearInterval(pollInterval);
+                    pollInterval = null;
+                }
                 await fetchStandings();
                 return;
             } else {
                 searchContainer.style.display = 'block';
-                // Garante o polling apenas para a aba de partidas ao vivo/jogos
                 if (!pollInterval) {
                     pollInterval = setInterval(fetchAllData, 5000);
                 }
@@ -792,25 +767,16 @@ dashboard_html = """
 
                 let matchKey = `${eventId}`;
                 let scoreKey = `${homeScore}-${awayScore}`;
-                let isGoalAlert = false;
                 if (previousScores[matchKey] && previousScores[matchKey] !== scoreKey) {
-                    isGoalAlert = true;
-                    let lastScorerInfo = "";
                     let [prevH, prevA] = previousScores[matchKey].split('-').map(Number);
                     let curH = parseInt(homeScore), curA = parseInt(awayScore);
                     
-                    if (curH > prevH) {
-                        let scName = hGoalsList.length > 0 ? hGoalsList[hGoalsList.length - 1].replace(/<\/?[^>]+(>|$)/g, "") : "Gol";
-                        lastScorerInfo = `Gol do ${homeTeam} ${homeScore} x ${awayScore} ${awayTeam} - Autor: ${scName}`;
-                    } else if (curA > prevA) {
-                        let scName = aGoalsList.length > 0 ? aGoalsList[aGoalsList.length - 1].replace(/<\/?[^>]+(>|$)/g, "") : "Gol";
-                        lastScorerInfo = `Gol do ${awayTeam} ${homeScore} x ${awayScore} ${homeTeam} - Autor: ${scName}`;
-                    } else {
-                        let scTeam = curH > prevH ? homeTeam : awayTeam;
-                        let advTeam = curH > prevH ? awayTeam : homeTeam;
-                        lastScorerInfo = `Gol do ${scTeam} ${homeScore} x ${awayScore} ${advTeam}`;
-                    }
-                    triggerTopGoalAlert(lastScorerInfo);
+                    let scoringTeamName = curH > prevH ? homeTeam : awayTeam;
+                    let scorerName = curH > prevH ? 
+                        (hGoalsList.length > 0 ? hGoalsList[hGoalsList.length - 1].replace(/<\/?[^>]+(>|$)/g, "").replace(/^⚽\s*(\(Pên\)\s*)?/, "") : "Desconhecido") :
+                        (aGoalsList.length > 0 ? aGoalsList[aGoalsList.length - 1].replace(/<\/?[^>]+(>|$)/g, "").replace(/^⚽\s*(\(Pên\)\s*)?/, "") : "Desconhecido");
+
+                    triggerTopGoalAlert(scoringTeamName, scorerName, homeTeam, awayTeam, homeScore, awayScore);
                 }
                 previousScores[matchKey] = scoreKey;
 
@@ -869,11 +835,10 @@ dashboard_html = """
                 } else if (state === 'in') {
                     let pName = period === 1 ? "1º Tempo" : (period === 2 ? "2º Tempo" : (period >= 3 ? "Prorrogação/Pênaltis" : `Tempo ${period}`));
                     let clockDisp = displayClock ? ` (${displayClock}')` : ` (${rawDetail})`;
-                    let scClass = isGoalAlert ? "goal-alert" : "";
                     centerBadge = `
                         <div>
                             <span class="badge-live"><span class="blinking-dot"></span>AO VIVO • ${pName}${clockDisp}</span>
-                            <div style="margin:6px 0;"><h2 class="score-box ${scClass}" style="margin:0;">${homeScore} x ${awayScore}</h2></div>
+                            <div style="margin:6px 0;"><h2 class="score-box" style="margin:0;">${homeScore} x ${awayScore}</h2></div>
                         </div>
                     `;
                 } else if (state === 'post') {
