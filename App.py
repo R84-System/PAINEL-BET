@@ -849,13 +849,13 @@ dashboard_html = """
                 let aPct = 100 - hPct;
 
                 let getBarColor = (pct) => pct >= 65 ? "#22c55e" : (pct >= 35 ? "#ffffff" : "#ef4444");
-                let getBarLabel = (pct) => pct >= 65 ? "🔥 Pressão Alta" : (pct >= 35 ? "⚖️ Neutro" : "🛡️ Defensiva / Baixa");
+                let getBarLabel = (pct) => pct >= 65 ? "Pressão Alta" : (pct >= 35 ? "Neutro" : "Defensiva / Baixa");
 
                 let hGoalsHtml = hGoalsList.length > 0 ? `<div style="text-align:right; font-size:11px; color:#facc15; margin-bottom:4px;">${hGoalsList.join("<br>")}</div>` : '';
-                let hRedCardsHtml = hRedCardsList.length > 0 ? `<div style="text-align:right; font-size:11px; color:#ef4444; margin-bottom:4px;">${hRedCardsList.join("<br>")}</div>` : '';
+                let hRedCardsHtml = hRedCardsList.length > 0 ? `<div style="text-align:right; font-size:11px; color:#facc15; margin-bottom:4px;">${hRedCardsList.join("<br>")}</div>` : '';
 
                 let aGoalsHtml = aGoalsList.length > 0 ? `<div style="text-align:left; font-size:11px; color:#facc15; margin-bottom:4px;">${aGoalsList.join("<br>")}</div>` : '';
-                let aRedCardsHtml = aRedCardsList.length > 0 ? `<div style="text-align:left; font-size:11px; color:#ef4444; margin-bottom:4px;">${aRedCardsList.join("<br>")}</div>` : '';
+                let aRedCardsHtml = aRedCardsList.length > 0 ? `<div style="text-align:left; font-size:11px; color:#facc15; margin-bottom:4px;">${aRedCardsList.join("<br>")}</div>` : '';
 
                 let centerBadge = "";
                 let isHalftime = (statusName === 'STATUS_HALFTIME' || rawDetail.toLowerCase().includes('halftime') || rawDetail.toLowerCase().includes('intervalo'));
