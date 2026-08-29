@@ -387,6 +387,15 @@ dashboard_html = """
             } catch(e) { return "Horário a confirmar"; }
         }
 
+        function getDateString(offsetDays) {
+            let d = new Date();
+            d.setDate(d.getDate() + offsetDays);
+            let year = d.getFullYear();
+            let month = String(d.getMonth() + 1).padStart(2, '0');
+            let day = String(d.getDate()).padStart(2, '0');
+            return `${year}${month}${day}`;
+        }
+
         async function asyncizedFetchSummary(slug, eventId) {
             let key = `${slug}_${eventId}`;
             if (summariesCache[key]) return summariesCache[key];
@@ -575,7 +584,6 @@ dashboard_html = """
                     let entries = group.entries || [];
                     if (entries.length === 0) continue;
 
-                    // Ordena as entradas rigorosamente pela posição (rank) em ordem crescente
                     entries.sort((a, b) => {
                         let getRank = (ent) => {
                             let s = {};
@@ -672,12 +680,23 @@ dashboard_html = """
             let matchesToDisplay = [];
             let leaguesToFetch = selectedLeague === 'all_live' ? Object.keys(LEAGUES) : [selectedLeague];
 
+            let todayStr = getDateString(0);
+            let tomorrowStr = getDateString(1);
+
             for (let lSlug of leaguesToFetch) {
                 try {
-                    let res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard`);
-                    if (!res.ok) continue;
-                    let data = await res.json();
-                    let events = data.events || [];
+                    let [resToday, resTomorrow] = await Promise.all([
+                        fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard?dates=${todayStr}`),
+                        fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard?dates=${tomorrowStr}`)
+                    ]);
+
+                    let dataToday = resToday.ok ? await resToday.json() : { events: [] };
+                    let dataTomorrow = resTomorrow.ok ? await resTomorrow.json() : { events: [] };
+
+                    let eventMap = {};
+                    (dataToday.events || []).forEach(ev => eventMap[ev.id] = ev);
+                    (dataTomorrow.events || []).forEach(ev => eventMap[ev.id] = ev);
+                    let events = Object.values(eventMap);
 
                     for (let ev of events) {
                         let comp = ev.competitions[0];
