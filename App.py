@@ -1,3 +1,10 @@
+import streamlit as st
+
+st.set_page_config(
+    page_title="Painel Pro de Futebol", page_icon="⚽", layout="wide"
+)
+
+dashboard_html = """
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -993,3 +1000,6 @@
     </script>
 </body>
 </html>
+"""
+
+st.components.v1.html(dashboard_html, height=1200, scrolling=True)
