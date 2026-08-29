@@ -4,6 +4,23 @@ st.set_page_config(
     page_title="Painel Pro de Futebol", page_icon="⚽", layout="wide"
 )
 
+# Remove as margens e o topo padrão do Streamlit para aproveitar 100% da tela
+st.markdown(
+    """
+    <style>
+        .block-container {
+            padding-top: 0.4rem !important;
+            padding-bottom: 0rem !important;
+            padding-left: 0.5rem !important;
+            padding-right: 0.5rem !important;
+        }
+        header {visibility: hidden;}
+        footer {visibility: hidden;}
+    </style>
+""",
+    unsafe_allow_html=True,
+)
+
 dashboard_html = """
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -17,7 +34,7 @@ dashboard_html = """
         }
         body {
             margin: 0;
-            padding: 10px;
+            padding: 4px;
             background-color: #0e1117;
             color: #fafafa;
         }
@@ -27,13 +44,13 @@ dashboard_html = """
             100% { opacity: 1; transform: scale(1); }
         }
         .blinking-dot {
-            height: 10px;
-            width: 10px;
+            height: 9px;
+            width: 9px;
             background-color: #22c55e;
             border-radius: 50%;
             display: inline-block;
             animation: blink 2s infinite ease-in-out;
-            margin-right: 6px;
+            margin-right: 5px;
             box-shadow: 0 0 8px #22c55e;
         }
         @keyframes topGoalPulse {
@@ -45,66 +62,66 @@ dashboard_html = """
             background-color: #166534;
             border: 2px solid #22c55e;
             color: #fff;
-            padding: 14px 20px;
-            border-radius: 10px;
-            margin-bottom: 15px;
+            padding: 12px 18px;
+            border-radius: 8px;
+            margin-bottom: 10px;
             text-align: center;
-            font-size: 15px;
+            font-size: 14px;
             font-weight: bold;
             animation: topGoalPulse 1.5s infinite ease-in-out;
-            box-shadow: 0 0 20px rgba(34, 197, 94, 0.6);
+            box-shadow: 0 0 15px rgba(34, 197, 94, 0.6);
             display: none;
-            line-height: 1.5;
+            line-height: 1.4;
         }
         .card {
             background-color: #1e293b;
             border: 1px solid #334155;
-            border-radius: 10px;
-            padding: 15px;
-            margin-bottom: 15px;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
         }
         .header-league {
-            font-size: 12px;
+            font-size: 11px;
             color: #94a3b8;
             font-weight: bold;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             text-transform: uppercase;
         }
         .match-grid {
             display: grid;
             grid-template-columns: 1fr auto 1fr;
             align-items: center;
-            gap: 15px;
+            gap: 12px;
         }
         .team-home {
             text-align: right;
-            font-size: 18px;
+            font-size: 16px;
             font-weight: bold;
         }
         .team-away {
             text-align: left;
-            font-size: 18px;
+            font-size: 16px;
             font-weight: bold;
         }
         .center-info {
             text-align: center;
         }
         .score-box {
-            font-size: 24px;
+            font-size: 22px;
             font-weight: 900;
             background-color: #0f172a;
-            padding: 6px 16px;
+            padding: 4px 14px;
             border-radius: 6px;
             border: 1px solid #334155;
             display: inline-block;
-            margin: 5px 0;
+            margin: 4px 0;
         }
         .badge-live {
             background-color: #0f172a;
             color: white;
-            padding: 4px 10px;
+            padding: 3px 8px;
             border-radius: 6px;
-            font-size: 11px;
+            font-size: 10px;
             font-weight: bold;
             border: 1px solid #334155;
             display: inline-block;
@@ -112,82 +129,82 @@ dashboard_html = """
         .badge-halftime {
             background-color: #eab308;
             color: #000;
-            padding: 4px 10px;
+            padding: 3px 8px;
             border-radius: 6px;
-            font-size: 11px;
+            font-size: 10px;
             font-weight: bold;
             display: inline-block;
         }
         .badge-post {
             color: #94a3b8;
             font-weight: bold;
-            font-size: 14px;
+            font-size: 13px;
         }
         .badge-pre {
             background-color: #3b82f6;
             color: white;
-            padding: 4px 8px;
+            padding: 3px 6px;
             border-radius: 6px;
-            font-size: 11px;
+            font-size: 10px;
             font-weight: bold;
         }
         .venue-text {
-            font-size: 11px;
+            font-size: 10px;
             color: #94a3b8;
-            margin-top: 4px;
+            margin-top: 2px;
         }
         .yellow-card {
             background-color: #eab308;
             color: #000;
-            padding: 1px 6px;
+            padding: 1px 5px;
             border-radius: 4px;
-            font-size: 10px;
+            font-size: 9px;
             font-weight: bold;
             display: inline-block;
         }
         .red-card {
             background-color: #ef4444;
             color: white;
-            padding: 1px 6px;
+            padding: 1px 5px;
             border-radius: 4px;
-            font-size: 10px;
+            font-size: 9px;
             font-weight: bold;
             display: inline-block;
         }
         .pressure-label {
-            font-size: 11px;
+            font-size: 10px;
             font-weight: bold;
         }
         .pressure-track {
             background-color: #334155;
             border-radius: 4px;
             width: 100%;
-            height: 8px;
+            height: 7px;
             overflow: hidden;
-            margin-top: 3px;
+            margin-top: 2px;
         }
         .pressure-fill {
             height: 100%;
             border-radius: 4px;
-            transition: width 0.5s ease;
+            transition: width 0.3s ease;
         }
         .controls {
-            margin-bottom: 15px;
+            margin-bottom: 10px;
             display: flex;
-            gap: 15px;
+            gap: 10px;
             flex-wrap: wrap;
             background: #1e293b;
-            padding: 15px;
-            border-radius: 10px;
+            padding: 10px;
+            border-radius: 8px;
             border: 1px solid #334155;
         }
         .controls select, .controls input {
             background: #0f172a;
             color: #fff;
             border: 1px solid #334155;
-            padding: 8px 12px;
+            padding: 6px 10px;
             border-radius: 6px;
-            font-size: 14px;
+            font-size: 13px;
             outline: none;
         }
         .controls input {
@@ -195,17 +212,17 @@ dashboard_html = """
         }
         .ticker-bar {
             background: #1e293b;
-            padding: 8px 12px;
-            border-radius: 8px;
+            padding: 6px 10px;
+            border-radius: 6px;
             border: 1px solid #334155;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
             overflow: hidden;
         }
         .ticker-title {
-            font-size: 11px;
+            font-size: 10px;
             color: #22c55e;
             font-weight: bold;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
         }
         .ticker-wrap {
             overflow: hidden;
@@ -226,12 +243,12 @@ dashboard_html = """
             100% { transform: translateX(-50%); }
         }
         details {
-            margin-top: 10px;
+            margin-top: 8px;
             background: #0f172a;
-            padding: 8px;
+            padding: 6px;
             border-radius: 6px;
             border: 1px solid #334155;
-            font-size: 12px;
+            font-size: 11px;
         }
         summary {
             cursor: pointer;
@@ -242,22 +259,22 @@ dashboard_html = """
             display: grid;
             grid-template-columns: 1fr 1fr 1fr;
             text-align: center;
-            margin-top: 8px;
-            gap: 10px;
+            margin-top: 6px;
+            gap: 8px;
         }
         .standings-table {
             width: 100%;
             border-collapse: collapse;
             background: #1e293b;
-            border-radius: 10px;
+            border-radius: 8px;
             overflow: hidden;
             border: 1px solid #334155;
-            margin-top: 15px;
+            margin-top: 10px;
         }
         .standings-table th, .standings-table td {
-            padding: 10px 12px;
+            padding: 8px 10px;
             text-align: center;
-            font-size: 13px;
+            font-size: 12px;
         }
         .standings-table th {
             background-color: #0f172a;
@@ -274,37 +291,37 @@ dashboard_html = """
         .bracket-container {
             display: flex;
             flex-direction: column;
-            gap: 20px;
-            margin-top: 15px;
+            gap: 15px;
+            margin-top: 10px;
         }
         .bracket-round-title {
             background: #0f172a;
             color: #facc15;
-            padding: 8px 12px;
+            padding: 6px 10px;
             border-radius: 6px;
             font-weight: bold;
-            font-size: 14px;
+            font-size: 13px;
             border-left: 4px solid #facc15;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
         }
         .bracket-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 12px;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 10px;
         }
         .bracket-match-card {
             background: #162032;
             border: 1px solid #334155;
-            border-radius: 8px;
-            padding: 12px;
+            border-radius: 6px;
+            padding: 10px;
         }
     </style>
 </head>
 <body>
 
-    <h2 style="margin-top:0; margin-bottom:12px; display:flex; align-items:center; gap:10px;">
+    <h3 style="margin-top:0; margin-bottom:8px; display:flex; align-items:center; gap:8px; font-size: 18px;">
         ⚽ Painel Pro de Futebol ao Vivo
-    </h2>
+    </h3>
 
     <div id="topGoalAlert" class="top-goal-banner"></div>
 
@@ -317,14 +334,14 @@ dashboard_html = """
 
     <div class="controls">
         <div>
-            <label style="font-size:12px; color:#94a3b8; display:block; margin-bottom:4px;">Visualização</label>
+            <label style="font-size:11px; color:#94a3b8; display:block; margin-bottom:2px;">Visualização</label>
             <select id="viewSelect">
                 <option value="matches">⚽ Partidas & Jogos</option>
                 <option value="standings">📊 Classificação & Chaveamentos</option>
             </select>
         </div>
         <div>
-            <label style="font-size:12px; color:#94a3b8; display:block; margin-bottom:4px;">Campeonato</label>
+            <label style="font-size:11px; color:#94a3b8; display:block; margin-bottom:2px;">Campeonato</label>
             <select id="leagueSelect">
                 <option value="all_live">🟢 Todos os Jogos ao Vivo (Global)</option>
                 <option value="bra.1">🇧🇷 Brasileirão Série A</option>
@@ -352,7 +369,7 @@ dashboard_html = """
             </select>
         </div>
         <div style="flex-grow: 1;" id="searchContainer">
-            <label style="font-size:12px; color:#94a3b8; display:block; margin-bottom:4px;">Buscar Time</label>
+            <label style="font-size:11px; color:#94a3b8; display:block; margin-bottom:2px;">Buscar Time</label>
             <input type="text" id="searchInput" placeholder="Ex: Flamengo, Real Madrid, Grêmio...">
         </div>
     </div>
@@ -405,9 +422,10 @@ dashboard_html = """
             return `${year}${month}${day}`;
         }
 
-        async function asyncizedFetchSummary(slug, eventId) {
+        async function asyncizedFetchSummary(slug, eventId, isLive = false) {
             let key = `${slug}_${eventId}`;
-            if (summariesCache[key]) return summariesCache[key];
+            // Se estiver ao vivo, ignoramos o cache permanente para buscar as estatísticas em tempo real a cada ciclo!
+            if (!isLive && summariesCache[key]) return summariesCache[key];
             try {
                 let res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${slug}/summary?event=${eventId}`);
                 if (res.ok) {
@@ -416,7 +434,7 @@ dashboard_html = """
                     return data;
                 }
             } catch(e) {}
-            return {};
+            return summariesCache[key] || {};
         }
 
         async function updateGlobalTicker() {
@@ -474,12 +492,12 @@ dashboard_html = """
         function triggerTopGoalAlert(scoringTeam, scorerName, hTeam, aTeam, hScore, aScore) {
             let banner = document.getElementById('topGoalAlert');
             if (!banner) return;
-            banner.innerHTML = `⚽ GOL DO <b>${scoringTeam.toUpperCase()}</b><br>Autor: <b>${scorerName}</b><br><span style="font-size:14px; color:#facc15;">${hTeam} ${hScore} x ${aScore} ${aTeam}</span>`;
+            banner.innerHTML = `⚽ GOL DO <b>${scoringTeam.toUpperCase()}</b><br>Autor: <b>${scorerName}</b><br><span style="font-size:13px; color:#facc15;">${hTeam} ${hScore} x ${aScore} ${aTeam}</span>`;
             banner.style.display = "block";
             if (goalAlertTimer) clearTimeout(goalAlertTimer);
             goalAlertTimer = setTimeout(() => {
                 banner.style.display = "none";
-            }, 12000);
+            }, 10000);
         }
 
         async function fetchStandings() {
@@ -495,7 +513,7 @@ dashboard_html = """
                 return;
             }
 
-            mainContainer.innerHTML = "<div style='text-align:center; color:#94a3b8; padding:30px;'>Carregando classificação e chaveamentos...</div>";
+            mainContainer.innerHTML = "<div style='text-align:center; color:#94a3b8; padding:20px;'>Carregando classificação e chaveamentos...</div>";
 
             let isCup = lSlug.includes('copa_brasil') || lSlug.includes('libertadores') || lSlug.includes('sudamericana') || lSlug.includes('champions') || lSlug.includes('europa') || lSlug.includes('friendly');
 
@@ -507,12 +525,12 @@ dashboard_html = """
                         let events = data.events || [];
                         let leagueTitle = LEAGUES[lSlug] || lSlug;
                         
-                        let html = `<h3 style="color:#38bdf8; margin-bottom:10px;">🏆 Chaveamento & Confrontos (Mata-Mata) - ${leagueTitle}</h3>`;
+                        let html = `<h3 style="color:#38bdf8; margin-bottom:8px; font-size:15px;">🏆 Chaveamento & Confrontos (Mata-Mata) - ${leagueTitle}</h3>`;
                         
                         if (events.length === 0) {
                             html = `
-                                <h3 style="color:#38bdf8; margin-bottom:10px;">🏆 Chaveamento & Confrontos (Mata-Mata) - ${leagueTitle}</h3>
-                                <div style='text-align:center; color:#94a3b8; padding:30px;'>Nenhum confronto de mata-mata encontrado no momento para este campeonato.</div>
+                                <h3 style="color:#38bdf8; margin-bottom:8px; font-size:15px;">🏆 Chaveamento & Confrontos (Mata-Mata) - ${leagueTitle}</h3>
+                                <div style='text-align:center; color:#94a3b8; padding:20px;'>Nenhum confronto de mata-mata encontrado no momento para este campeonato.</div>
                             `;
                             standingsCache[lSlug] = html;
                             mainContainer.innerHTML = html;
@@ -554,13 +572,13 @@ dashboard_html = """
 
                                 html += `
                                     <div class="bracket-match-card">
-                                        <div style="font-size:10px; color:#94a3b8; margin-bottom:4px;">📅 ${dateStr}</div>
-                                        <div style="display:flex; justify-content:space-between; align-items:center; font-size:14px; font-weight:bold; margin:6px 0;">
+                                        <div style="font-size:9px; color:#94a3b8; margin-bottom:3px;">📅 ${dateStr}</div>
+                                        <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px; font-weight:bold; margin:4px 0;">
                                             <span style="flex:1; text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${hTeam}">${hTeam}</span>
-                                            <span style="background:#0f172a; padding:3px 8px; border-radius:4px; margin:0 8px; border:1px solid #334155; font-size:13px;">${hScore} x ${aScore}</span>
+                                            <span style="background:#0f172a; padding:2px 6px; border-radius:4px; margin:0 6px; border:1px solid #334155; font-size:12px;">${hScore} x ${aScore}</span>
                                             <span style="flex:1; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${aTeam}">${aTeam}</span>
                                         </div>
-                                        <div style="text-align:center; font-size:10px; color:#38bdf8; margin-top:4px;">${statusDetail}</div>
+                                        <div style="text-align:center; font-size:9px; color:#38bdf8; margin-top:3px;">${statusDetail}</div>
                                     </div>
                                 `;
                             }
@@ -578,7 +596,7 @@ dashboard_html = """
             try {
                 let res = await fetch(`https://site.api.espn.com/apis/v2/sports/soccer/${lSlug}/standings`);
                 if (!res.ok) {
-                    let errHtml = "<div style='text-align:center; color:#94a3b8; padding:30px;'>Classificação indisponível para esta liga no momento.</div>";
+                    let errHtml = "<div style='text-align:center; color:#94a3b8; padding:20px;'>Classificação indisponível para esta liga no momento.</div>";
                     mainContainer.innerHTML = errHtml;
                     return;
                 }
@@ -594,12 +612,12 @@ dashboard_html = """
                 }
 
                 if (standingsGroups.length === 0) {
-                    let errHtml = "<div style='text-align:center; color:#94a3b8; padding:30px;'>Nenhuma tabela encontrada para este campeonato.</div>";
+                    let errHtml = "<div style='text-align:center; color:#94a3b8; padding:20px;'>Nenhuma tabela encontrada para este campeonato.</div>";
                     mainContainer.innerHTML = errHtml;
                     return;
                 }
 
-                let html = `<h3 style="color:#38bdf8; margin-bottom:10px;">📊 Classificação - ${LEAGUES[lSlug] || lSlug}</h3>`;
+                let html = `<h3 style="color:#38bdf8; margin-bottom:8px; font-size:15px;">📊 Classificação - ${LEAGUES[lSlug] || lSlug}</h3>`;
 
                 for (let group of standingsGroups) {
                     let entries = group.entries || [];
@@ -615,7 +633,7 @@ dashboard_html = """
                     });
 
                     html += `
-                        <div style="font-weight:bold; color:#facc15; margin-top:15px; margin-bottom:5px;">${group.name || 'Tabela Principal'}</div>
+                        <div style="font-weight:bold; color:#facc15; margin-top:12px; margin-bottom:4px; font-size:13px;">${group.name || 'Tabela Principal'}</div>
                         <table class="standings-table">
                             <thead>
                                 <tr>
@@ -671,7 +689,7 @@ dashboard_html = """
                 mainContainer.innerHTML = html;
                 currentLoadedStandingsKey = lSlug;
             } catch(e) {
-                mainContainer.innerHTML = "<div style='text-align:center; color:#94a3b8; padding:30px;'>Erro ao carregar a classificação.</div>";
+                mainContainer.innerHTML = "<div style='text-align:center; color:#94a3b8; padding:20px;'>Erro ao carregar a classificação.</div>";
             }
         }
 
@@ -691,7 +709,8 @@ dashboard_html = """
             } else {
                 searchContainer.style.display = 'block';
                 if (!pollInterval) {
-                    pollInterval = setInterval(fetchAllData, 5000);
+                    // Atualização extremamente rápida a cada 2 segundos (2000ms) para manter estatísticas e termômetro em tempo real
+                    pollInterval = setInterval(fetchAllData, 2000);
                 }
             }
 
@@ -743,15 +762,18 @@ dashboard_html = """
                 } catch(e) {}
             }
 
+            // Busca os resumos garantindo atualização em tempo real para jogos ao vivo
             for (let item of matchesToDisplay) {
-                await asyncizedFetchSummary(item.lSlug, item.event.id);
+                let state = item.event.competitions[0].status.type.state;
+                let isLiveMatch = (state === 'in' || item.event.competitions[0].status.type.name === 'STATUS_HALFTIME');
+                await asyncizedFetchSummary(item.lSlug, item.event.id, isLiveMatch);
             }
 
             updateGlobalTicker();
 
             let mainContainer = document.getElementById('mainContainer');
             if (matchesToDisplay.length === 0) {
-                mainContainer.innerHTML = "<div style='text-align:center; color:#94a3b8; padding:30px;'>Nenhuma partida encontrada no momento para esta seleção/filtro.</div>";
+                mainContainer.innerHTML = "<div style='text-align:center; color:#94a3b8; padding:20px;'>Nenhuma partida encontrada no momento para esta seleção/filtro.</div>";
                 return;
             }
 
@@ -905,11 +927,11 @@ dashboard_html = """
                 let getBarColor = (pct) => pct > 65 ? "#22c55e" : (pct > 51 ? "#f97316" : (pct >= 35 ? "#ffffff" : "#ef4444"));
                 let getBarLabel = (pct) => pct > 65 ? "Pressão Alta" : (pct > 51 ? "Pressão Moderada" : (pct >= 35 ? "Neutro" : "Defensiva / Baixa"));
 
-                let hGoalsHtml = hGoalsList.length > 0 ? `<div style="text-align:right; font-size:11px; color:#facc15; margin-bottom:4px;">${hGoalsList.join("<br>")}</div>` : '';
-                let hRedCardsHtml = hRedCardsList.length > 0 ? `<div style="text-align:right; font-size:11px; color:#facc15; margin-bottom:4px;">${hRedCardsList.join("<br>")}</div>` : '';
+                let hGoalsHtml = hGoalsList.length > 0 ? `<div style="text-align:right; font-size:10px; color:#facc15; margin-bottom:3px;">${hGoalsList.join("<br>")}</div>` : '';
+                let hRedCardsHtml = hRedCardsList.length > 0 ? `<div style="text-align:right; font-size:10px; color:#facc15; margin-bottom:3px;">${hRedCardsList.join("<br>")}</div>` : '';
 
-                let aGoalsHtml = aGoalsList.length > 0 ? `<div style="text-align:left; font-size:11px; color:#facc15; margin-bottom:4px;">${aGoalsList.join("<br>")}</div>` : '';
-                let aRedCardsHtml = aRedCardsList.length > 0 ? `<div style="text-align:left; font-size:11px; color:#facc15; margin-bottom:4px;">${aRedCardsList.join("<br>")}</div>` : '';
+                let aGoalsHtml = aGoalsList.length > 0 ? `<div style="text-align:left; font-size:10px; color:#facc15; margin-bottom:3px;">${aGoalsList.join("<br>")}</div>` : '';
+                let aRedCardsHtml = aRedCardsList.length > 0 ? `<div style="text-align:left; font-size:10px; color:#facc15; margin-bottom:3px;">${aRedCardsList.join("<br>")}</div>` : '';
 
                 let centerBadge = "";
                 let isHalftime = (statusName === 'STATUS_HALFTIME' || rawDetail.toLowerCase().includes('halftime') || rawDetail.toLowerCase().includes('intervalo'));
@@ -918,7 +940,7 @@ dashboard_html = """
                     centerBadge = `
                         <div>
                             <span class="badge-halftime">⏸️ INTERVALO</span>
-                            <div style="margin:6px 0;"><h2 class="score-box" style="margin:0;">${homeScore} x ${awayScore}</h2></div>
+                            <div style="margin:4px 0;"><h2 class="score-box" style="margin:0;">${homeScore} x ${awayScore}</h2></div>
                         </div>
                     `;
                 } else if (state === 'in') {
@@ -927,14 +949,14 @@ dashboard_html = """
                     centerBadge = `
                         <div>
                             <span class="badge-live"><span class="blinking-dot"></span>AO VIVO • ${pName}${clockDisp}</span>
-                            <div style="margin:6px 0;"><h2 class="score-box" style="margin:0;">${homeScore} x ${awayScore}</h2></div>
+                            <div style="margin:4px 0;"><h2 class="score-box" style="margin:0;">${homeScore} x ${awayScore}</h2></div>
                         </div>
                     `;
                 } else if (state === 'post') {
                     centerBadge = `
                         <div>
                             <span class="badge-post">ENCERRADO</span>
-                            <h2 style="color:#fff; margin:6px 0;">${homeScore} x ${awayScore}</h2>
+                            <h2 style="color:#fff; margin:4px 0;">${homeScore} x ${awayScore}</h2>
                         </div>
                     `;
                 } else {
@@ -942,7 +964,7 @@ dashboard_html = """
                         <div>
                             <span class="badge-pre">🕒 ${kickoff}</span>
                             <div class="venue-text">📍 ${venueName}</div>
-                            <h3 style="color:#94a3b8; margin:4px 0;">vs</h3>
+                            <h3 style="color:#94a3b8; margin:3px 0;">vs</h3>
                         </div>
                     `;
                 }
@@ -965,7 +987,7 @@ dashboard_html = """
                                 ${hGoalsHtml}
                                 ${hRedCardsHtml}
                                 <div class="team-home">${homeTeam}</div>
-                                <div style="text-align:right; margin-top:6px;">
+                                <div style="text-align:right; margin-top:4px;">
                                     <span class="pressure-label" style="color: ${getBarColor(hPct)};">${getBarLabel(hPct)} (${hPct}%)</span>
                                     <div class="pressure-track"><div class="pressure-fill" style="background-color: ${getBarColor(hPct)}; width: ${hPct}%;"></div></div>
                                 </div>
@@ -977,7 +999,7 @@ dashboard_html = """
                                 ${aGoalsHtml}
                                 ${aRedCardsHtml}
                                 <div class="team-away">${awayTeam}</div>
-                                <div style="text-align:left; margin-top:6px;">
+                                <div style="text-align:left; margin-top:4px;">
                                     <span class="pressure-label" style="color: ${getBarColor(aPct)};">${getBarLabel(aPct)} (${aPct}%)</span>
                                     <div class="pressure-track"><div class="pressure-fill" style="background-color: ${getBarColor(aPct)}; width: ${aPct}%;"></div></div>
                                 </div>
@@ -1005,10 +1027,10 @@ dashboard_html = """
         document.getElementById('searchInput').addEventListener('input', fetchAllData);
 
         fetchAllData();
-        pollInterval = setInterval(fetchAllData, 5000);
+        pollInterval = setInterval(fetchAllData, 2000);
     </script>
 </body>
 </html>
 """
 
-st.components.v1.html(dashboard_html, height=1200, scrolling=True)
+st.components.v1.html(dashboard_html, height=1250, scrolling=True)
