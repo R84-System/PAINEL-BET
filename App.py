@@ -333,7 +333,7 @@ dashboard_html = """
         <div id="topGoalAlert" class="top-goal-banner"></div>
 
         <div class="ticker-bar" id="tickerContainer" style="display:none;">
-            <div class="ticker-title">🟢 TICKER AO VIVO (GLOBAL) - PLACAR EM TEMPO REAL</div>
+            <div class="ticker-title">🟢 AO VIVO (GLOBAL) - PLACAR EM TEMPO REAL</div>
             <div class="ticker-wrap">
                 <div class="ticker-move" id="tickerContent"></div>
             </div>
@@ -344,7 +344,7 @@ dashboard_html = """
                 <label style="font-size:11px; color:#dbeafe; display:block; margin-bottom:2px; font-weight:bold;">Visualização</label>
                 <select id="viewSelect">
                     <option value="matches">⚽ Partidas & Jogos</option>
-                    <option value="standings">📊 Classificação & Chaveamentos</option>
+                    <option value="standings">📊 Classificação</option>
                 </select>
             </div>
             <div>
@@ -377,7 +377,7 @@ dashboard_html = """
             </div>
             <div style="flex-grow: 1;" id="searchContainer">
                 <label style="font-size:11px; color:#dbeafe; display:block; margin-bottom:2px; font-weight:bold;">Buscar Time</label>
-                <input type="text" id="searchInput" placeholder="Ex: Flamengo, Real Madrid, Grêmio...">
+                <input type="text" id="searchInput" placeholder="Digite aqui">
             </div>
         </div>
     </div>
