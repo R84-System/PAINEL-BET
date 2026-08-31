@@ -251,7 +251,7 @@ dashboard_html = """
         details {
             margin-top: 8px;
             background: #0f172a;
-            padding: 8px;
+            padding: 10px;
             border-radius: 6px;
             border: 1px solid #334155;
             font-size: 11px;
@@ -260,16 +260,31 @@ dashboard_html = """
             cursor: pointer;
             font-weight: bold;
             color: #38bdf8;
+            font-size: 12px;
         }
         .stats-grid {
             display: grid;
             grid-template-columns: 1fr 1fr 1fr;
             text-align: center;
-            margin-top: 6px;
+            margin-top: 8px;
             gap: 8px;
             border-bottom: 1px solid #334155;
-            padding-bottom: 8px;
-            margin-bottom: 8px;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+        }
+        .unified-rosters-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 8px;
+        }
+        .roster-box {
+            background: #162032;
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid #334155;
+            max-height: 160px;
+            overflow-y: auto;
         }
         .standings-table {
             width: 100%;
@@ -323,21 +338,6 @@ dashboard_html = """
             border: 1px solid #334155;
             border-radius: 6px;
             padding: 10px;
-        }
-        .subs-rosters-section {
-            margin-top: 6px;
-        }
-        .sub-item {
-            font-size: 11px;
-            color: #cbd5e1;
-            padding: 2px 0;
-            border-bottom: 1px dashed rgba(51, 65, 85, 0.5);
-        }
-        .rosters-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-top: 6px;
         }
     </style>
 </head>
@@ -875,7 +875,6 @@ dashboard_html = """
                 let aGoalsList = [];
                 let hRedCardsList = [];
                 let aRedCardsList = [];
-                let subsList = [];
                 let hRosterList = [];
                 let aRosterList = [];
 
@@ -916,14 +915,6 @@ dashboard_html = """
                     let typeName = (d.type && d.type.name) ? d.type.name.toLowerCase() : "";
                     let isHome = d.team && d.team.id === homeTeamId;
                     let isAway = d.team && d.team.id === awayTeamId;
-
-                    // Captura de Substituições (Entrou / Saiu)
-                    if (text.includes("substitution") || text.includes("substituição") || typeName.includes("sub") || (d.text && d.text.toLowerCase().includes("substitution"))) {
-                        let subTeamName = isHome ? homeTeam : (isAway ? awayTeam : "Time");
-                        let subText = d.text || text || "Substituição realizada";
-                        let clockVal = (d.clock && d.clock.displayValue) ? d.clock.displayValue : "";
-                        subsList.append ? null : subsList.push(`🔄 <b>[${subTeamName}]</b> ${clockVal ? '(' + clockVal + "') " : ''}${subText}`);
-                    }
 
                     if (text.includes("yellow card") || text.includes("cartão amarelo") || typeName.includes("yellow") || typeName.includes("yellowcard")) {
                         if (isHome) hYellowCount++;
@@ -1024,7 +1015,6 @@ dashboard_html = """
                 let hSaves = parseNum(hStats.saves || hStats.defesas || 0);
                 let aSaves = parseNum(aStats.saves || aStats.defesas || 0);
 
-                // Pressure calculation (incluindo Defesas do Goleiro Adversário no 1º Tempo)
                 let hScorePress = 0;
                 let aScorePress = 0;
                 let isSecondHalf = (period >= 2 || statusName.includes('SECOND_HALF') || rawDetail.toLowerCase().includes('2º tempo') || rawDetail.toLowerCase().includes('second half'));
@@ -1071,7 +1061,6 @@ dashboard_html = """
                     let aCorners = parseNum(aStats.wonCorners || 0);
                     let aPoss = parseNum(aStats.possessionPct || 50);
 
-                    // Incluindo aSaves (defesas do goleiro da Chape/adversário) para pesar a pressão do Grêmio
                     hScorePress = (hShotsOn * 3.0) + (hShotsTot * 1.0) + (hCorners * 1.5) + (hPoss * 0.2) + (aSaves * 1.5);
                     aScorePress = (aShotsOn * 3.0) + (aShotsTot * 1.0) + (aCorners * 1.5) + (aPoss * 0.2) + (hSaves * 1.5);
                 }
@@ -1129,15 +1118,12 @@ dashboard_html = """
                 let possH = hStats.possessionPct || "0%"; if(!possH.includes("%") && possH !== "0") possH += "%";
                 let possA = aStats.possessionPct || "0%"; if(!possA.includes("%") && possA !== "0") possA += "%";
 
-                // Bloco de Estatísticas Detalhadas incluindo Defesas
                 let statsInnerHtml = `
                     <p style='text-align: right;'><b>${possH}</b><br>${hStats.shotsOnTarget || '0'}<br>${hStats.totalShots || '0'}<br>${hStats.wonCorners || '0'}<br>${hStats.foulsCommitted || hStats.fouls || '0'}<br><b>${hSaves}</b><br><span class="yellow-card">🟨 ${hYellowCount}</span><br><span class="red-card">🟥 ${hRedCount}</span></p>
                     <p style='text-align: center; color: #94a3b8;'>Posse de Bola<br>Chutes no Gol<br>Chutes Totais<br>Escanteios<br>Faltas Cometidas<br>Defesas do Goleiro<br>Cartões Amarelos<br>Cartões Vermelhos</p>
                     <p style='text-align: left;'><b>${possA}</b><br>${aStats.shotsOnTarget || '0'}<br>${aStats.totalShots || '0'}<br>${aStats.wonCorners || '0'}<br>${aStats.foulsCommitted || aStats.fouls || '0'}<br><b>${aSaves}</b><br><span class="yellow-card">🟨 ${aYellowCount}</span><br><span class="red-card">🟥 ${aRedCount}</span></p>
                 `;
 
-                // Bloco de Substituições e Escalações dentro do Accordion
-                let subsHtmlContent = subsList.length > 0 ? subsList.join("<br>") : "<span style='color:#64748b; font-style:italic;'>Nenhuma substituição registrada até o momento.</span>";
                 let hRosterHtml = hRosterList.length > 0 ? hRosterList.join("<br>") : "<span style='color:#64748b;'>Escalação não informada</span>";
                 let aRosterHtml = aRosterList.length > 0 ? aRosterList.join("<br>") : "<span style='color:#64748b;'>Escalação não informada</span>";
 
@@ -1169,27 +1155,20 @@ dashboard_html = """
                         </div>
 
                         <details data-event-id="${eventId}" ${isOpen} ontoggle="openStates['${eventId}'] = this.open;">
-                            <summary>📊 Ver Estatísticas Detalhadas, Substituições & Escalações (${homeTeam} vs ${awayTeam})</summary>
-                            <div id="stats_${eventId}" class="stats-grid">
+                            <summary>📊 Estatísticas & Escalações (${homeTeam} vs ${awayTeam})</summary>
+                            <div class="stats-grid">
                                 ${statsInnerHtml}
                             </div>
                             
-                            <div class="subs-rosters-section">
-                                <div style="font-weight:bold; color:#38bdf8; margin-bottom:4px; font-size:12px;">🔄 Substituições em Tempo Real:</div>
-                                <div style="background:#0b0f17; padding:6px 8px; border-radius:4px; margin-bottom:8px; max-height:90px; overflow-y:auto;">
-                                    ${subsHtmlContent}
+                            <div style="font-weight:bold; color:#facc15; margin-bottom:6px; font-size:12px;">📋 Escalação dos Times:</div>
+                            <div class="unified-rosters-grid">
+                                <div class="roster-box">
+                                    <div style="font-weight:bold; color:#38bdf8; margin-bottom:4px; font-size:11px; text-transform:uppercase;">${homeTeam}</div>
+                                    <div style="font-size:10px; color:#cbd5e1; line-height: 1.4;">${hRosterHtml}</div>
                                 </div>
-                                
-                                <div style="font-weight:bold; color:#facc15; margin-bottom:4px; font-size:12px;">📋 Escalações (Titulares / Relacionados):</div>
-                                <div class="rosters-grid">
-                                    <div style="background:#0b0f17; padding:6px 8px; border-radius:4px; max-height:120px; overflow-y:auto;">
-                                        <div style="font-weight:bold; color:#38bdf8; margin-bottom:3px; font-size:11px;">${homeTeam}</div>
-                                        <div style="font-size:10px; color:#cbd5e1;">${hRosterHtml}</div>
-                                    </div>
-                                    <div style="background:#0b0f17; padding:6px 8px; border-radius:4px; max-height:120px; overflow-y:auto;">
-                                        <div style="font-weight:bold; color:#f43f5e; margin-bottom:3px; font-size:11px;">${awayTeam}</div>
-                                        <div style="font-size:10px; color:#cbd5e1;">${aRosterHtml}</div>
-                                    </div>
+                                <div class="roster-box">
+                                    <div style="font-weight:bold; color:#f43f5e; margin-bottom:4px; font-size:11px; text-transform:uppercase;">${awayTeam}</div>
+                                    <div style="font-size:10px; color:#cbd5e1; line-height: 1.4;">${aRosterHtml}</div>
                                 </div>
                             </div>
                         </details>
