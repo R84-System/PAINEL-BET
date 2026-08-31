@@ -264,8 +264,8 @@ dashboard_html = """
         }
         .match-details-layout {
             display: grid;
-            grid-template-columns: 0.8fr 1.6fr 0.8fr;
-            gap: 10px;
+            grid-template-columns: 0.7fr 1.8fr 0.7fr;
+            gap: 8px;
             margin-top: 10px;
             align-items: start;
         }
@@ -978,35 +978,38 @@ dashboard_html = """
                         }
                     }
 
-                    // Detecção de Substituições e atualização dos 11 em campo
+                    // Detecção de Substituições (Tipo Entra e Sai)
                     if (text.includes("substitution") || text.includes("substituição") || typeName.includes("sub")) {
                         let playerIn = "";
                         let playerOut = "";
                         if (d.athletesInvolved && d.athletesInvolved.length >= 2) {
-                            playerIn = d.athletesInvolved[0].displayName || "";
-                            playerOut = d.athletesInvolved[1].displayName || "";
+                            playerIn = d.athletesInvolved[0].displayName || d.athletesInvolved[0].name || "";
+                            playerOut = d.athletesInvolved[1].displayName || d.athletesInvolved[1].name || "";
+                        } else if (d.participants && d.participants.length >= 2) {
+                            playerIn = d.participants[0].athlete?.displayName || "";
+                            playerOut = d.participants[1].athlete?.displayName || "";
                         } else if (d.athlete && d.athlete.displayName) {
                             playerIn = d.athlete.displayName;
                         }
                         let clockVal = (d.clock && d.clock.displayValue) ? d.clock.displayValue : "";
-                        let subStr = `🔄 <span style="color:#22c55e;">${playerIn} ⬆️</span> / <span style="color:#ef4444;">${playerOut} ⬇️</span> ${clockVal ? '(' + clockVal + "')" : ''}`;
+                        let subStr = `🔄 <span style="color:#22c55e;">🟢 ${playerIn} ⬆️</span> / <span style="color:#ef4444;">🔴 ${playerOut} ⬇️</span> ${clockVal ? '(' + clockVal + "')" : ''}`;
                         
                         if (isHome) {
                             substitutionsListHome.push(subStr);
                             let idx = hCurrentPlayers.findIndex(p => p.toLowerCase().includes(playerOut.toLowerCase()));
                             if (idx !== -1) {
-                                hCurrentPlayers[idx] = `<span style="color:#22c55e;">${playerIn} (Entrou)</span> <span style="color:#64748b; font-size:9px;">[Saiu ${playerOut}]</span>`;
+                                hCurrentPlayers[idx] = `<span style="color:#22c55e;">🟢 ${playerIn} (Entrou)</span> <span style="color:#ef4444; font-size:9px;">[Saiu ${playerOut}]</span>`;
                             } else {
-                                hCurrentPlayers.push(`<span style="color:#22c55e;">${playerIn} (Entrou)</span>`);
+                                hCurrentPlayers.push(`<span style="color:#22c55e;">🟢 ${playerIn} (Entrou)</span> <span style="color:#ef4444; font-size:9px;">[Saiu ${playerOut}]</span>`);
                             }
                         }
                         if (isAway) {
                             substitutionsListAway.push(subStr);
                             let idx = aCurrentPlayers.findIndex(p => p.toLowerCase().includes(playerOut.toLowerCase()));
                             if (idx !== -1) {
-                                aCurrentPlayers[idx] = `<span style="color:#22c55e;">${playerIn} (Entrou)</span> <span style="color:#64748b; font-size:9px;">[Saiu ${playerOut}]</span>`;
+                                aCurrentPlayers[idx] = `<span style="color:#22c55e;">🟢 ${playerIn} (Entrou)</span> <span style="color:#ef4444; font-size:9px;">[Saiu ${playerOut}]</span>`;
                             } else {
-                                aCurrentPlayers.push(`<span style="color:#22c55e;">${playerIn} (Entrou)</span>`);
+                                aCurrentPlayers.push(`<span style="color:#22c55e;">🟢 ${playerIn} (Entrou)</span> <span style="color:#ef4444; font-size:9px;">[Saiu ${playerOut}]</span>`);
                             }
                         }
                     }
