@@ -978,24 +978,43 @@ dashboard_html = """
                         }
                     }
 
-                    // Detecção de Substituições (Tipo Entra e Sai)
-                    if (text.includes("substitution") || text.includes("substituição") || typeName.includes("sub")) {
+                    // Detecção Robusta de Substituições (Entra e Sai)
+                    let isSub = text.includes("substitution") || text.includes("substituição") || typeName.includes("sub") || text.includes("sub");
+                    if (isSub) {
                         let playerIn = "";
                         let playerOut = "";
+
+                        // Tentativa 1: athletesInvolved (geralmente [0] = entra, [1] = sai)
                         if (d.athletesInvolved && d.athletesInvolved.length >= 2) {
                             playerIn = d.athletesInvolved[0].displayName || d.athletesInvolved[0].name || "";
                             playerOut = d.athletesInvolved[1].displayName || d.athletesInvolved[1].name || "";
-                        } else if (d.participants && d.participants.length >= 2) {
-                            playerIn = d.participants[0].athlete?.displayName || "";
-                            playerOut = d.participants[1].athlete?.displayName || "";
+                        } 
+                        // Tentativa 2: participants
+                        else if (d.participants && d.participants.length >= 2) {
+                            playerIn = d.participants[0].athlete?.displayName || d.participants[0].name || "";
+                            playerOut = d.participants[1].athlete?.displayName || d.participants[1].name || "";
+                        }
+                        // Tentativa 3: text parsing caso venha no formato "Entra: X / Sai: Y" ou texto livre
+                        else if (d.text) {
+                            let parts = d.text.split('/');
+                            if (parts.length >= 2) {
+                                playerIn = parts[0].replace(/[^a-zA-Zá-úÁ-Ú\s]/g, '').trim();
+                                playerOut = parts[1].replace(/[^a-zA-Zá-úÁ-Ú\s]/g, '').trim();
+                            } else {
+                                playerIn = d.athlete?.displayName || "Substituto";
+                            }
                         } else if (d.athlete && d.athlete.displayName) {
                             playerIn = d.athlete.displayName;
                         }
+
+                        if (!playerIn) playerIn = "Entrou";
+                        if (!playerOut) playerOut = "Saiu";
+
                         let clockVal = (d.clock && d.clock.displayValue) ? d.clock.displayValue : "";
                         let subStr = `🔄 <span style="color:#22c55e;">🟢 ${playerIn} ⬆️</span> / <span style="color:#ef4444;">🔴 ${playerOut} ⬇️</span> ${clockVal ? '(' + clockVal + "')" : ''}`;
                         
                         if (isHome) {
-                            substitutionsListHome.push(subStr);
+                            if (!substitutionsListHome.includes(subStr)) substitutionsListHome.push(subStr);
                             let idx = hCurrentPlayers.findIndex(p => p.toLowerCase().includes(playerOut.toLowerCase()));
                             if (idx !== -1) {
                                 hCurrentPlayers[idx] = `<span style="color:#22c55e;">🟢 ${playerIn} (Entrou)</span> <span style="color:#ef4444; font-size:9px;">[Saiu ${playerOut}]</span>`;
@@ -1004,7 +1023,7 @@ dashboard_html = """
                             }
                         }
                         if (isAway) {
-                            substitutionsListAway.push(subStr);
+                            if (!substitutionsListAway.includes(subStr)) substitutionsListAway.push(subStr);
                             let idx = aCurrentPlayers.findIndex(p => p.toLowerCase().includes(playerOut.toLowerCase()));
                             if (idx !== -1) {
                                 aCurrentPlayers[idx] = `<span style="color:#22c55e;">🟢 ${playerIn} (Entrou)</span> <span style="color:#ef4444; font-size:9px;">[Saiu ${playerOut}]</span>`;
