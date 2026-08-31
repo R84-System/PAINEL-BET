@@ -262,29 +262,33 @@ dashboard_html = """
             color: #38bdf8;
             font-size: 12px;
         }
-        .stats-grid {
+        .match-details-layout {
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            text-align: center;
-            margin-top: 8px;
-            gap: 8px;
-            border-bottom: 1px solid #334155;
-            padding-bottom: 10px;
-            margin-bottom: 10px;
+            grid-template-columns: 1fr 1.2fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+            align-items: start;
         }
-        .unified-rosters-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-top: 8px;
-        }
-        .roster-box {
+        .roster-panel {
             background: #162032;
             padding: 8px;
             border-radius: 6px;
             border: 1px solid #334155;
-            max-height: 160px;
+            max-height: 220px;
             overflow-y: auto;
+        }
+        .stats-panel {
+            background: #162032;
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid #334155;
+        }
+        .stats-grid-inner {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            text-align: center;
+            gap: 4px;
+            font-size: 11px;
         }
         .standings-table {
             width: 100%;
@@ -875,8 +879,11 @@ dashboard_html = """
                 let aGoalsList = [];
                 let hRedCardsList = [];
                 let aRedCardsList = [];
-                let hRosterList = [];
-                let aRosterList = [];
+                
+                let hStarters = [];
+                let aStarters = [];
+                let substitutionsListHome = [];
+                let substitutionsListAway = [];
 
                 let allDetails = [];
                 if (competition.details) allDetails = allDetails.concat(competition.details);
@@ -894,7 +901,7 @@ dashboard_html = """
                     }
                 }
 
-                // Extração de Escalações (Rosters) do Summary
+                // Extração de Escalados / Titulares e Substituições
                 if (summary.rosters) {
                     summary.rosters.forEach(r => {
                         let isHome = r.team && r.team.id === homeTeamId;
@@ -904,9 +911,40 @@ dashboard_html = """
                             let pNum = p.jersey || p.shirtNumber || "";
                             let pPos = p.position?.abbreviation || "";
                             let playerStr = `${pNum ? '#' + pNum + ' ' : ''}${pName} ${pPos ? '(' + pPos + ')' : ''}`;
-                            if (isHome) hRosterList.push(playerStr);
-                            else aRosterList.push(playerStr);
+                            
+                            if (p.starter === true || p.starting === true) {
+                                if (isHome) hStarters.push(playerStr);
+                                else aStarters.push(playerStr);
+                            }
                         });
+                    });
+                }
+
+                // Fallback se a API não retornar o booleano explicitamente
+                if (hStarters.length === 0 && summary.rosters) {
+                    summary.rosters.forEach(r => {
+                        if (r.team && r.team.id === homeTeamId) {
+                            let arr = r.roster || r.athletes || [];
+                            arr.slice(0, 11).forEach(p => {
+                                let pName = p.athlete?.displayName || p.name || "Jogador";
+                                let pNum = p.jersey || p.shirtNumber || "";
+                                let pPos = p.position?.abbreviation || "";
+                                hStarters.push(`${pNum ? '#' + pNum + ' ' : ''}${pName} ${pPos ? '(' + pPos + ')' : ''}`);
+                            });
+                        }
+                    });
+                }
+                if (aStarters.length === 0 && summary.rosters) {
+                    summary.rosters.forEach(r => {
+                        if (r.team && r.team.id === awayTeamId) {
+                            let arr = r.roster || r.athletes || [];
+                            arr.slice(0, 11).forEach(p => {
+                                let pName = p.athlete?.displayName || p.name || "Jogador";
+                                let pNum = p.jersey || p.shirtNumber || "";
+                                let pPos = p.position?.abbreviation || "";
+                                aStarters.push(`${pNum ? '#' + pNum + ' ' : ''}${pName} ${pPos ? '(' + pPos + ')' : ''}`);
+                            });
+                        }
                     });
                 }
 
@@ -935,6 +973,22 @@ dashboard_html = """
                         } else if (isAway) {
                             if (!aRedCardsList.includes(redStr)) aRedCardsList.push(redStr);
                         }
+                    }
+
+                    // Detecção de Substituições
+                    if (text.includes("substitution") || text.includes("substituição") || typeName.includes("sub")) {
+                        let playerIn = "";
+                        let playerOut = "";
+                        if (d.athletesInvolved && d.athletesInvolved.length >= 2) {
+                            playerIn = d.athletesInvolved[0].displayName || "";
+                            playerOut = d.athletesInvolved[1].displayName || "";
+                        } else if (d.athlete && d.athlete.displayName) {
+                            playerIn = d.athlete.displayName;
+                        }
+                        let clockVal = (d.clock && d.clock.displayValue) ? d.clock.displayValue : "";
+                        let subStr = `🔄 <span style="color:#22c55e;">${playerIn} ⬆️</span> / <span style="color:#ef4444;">${playerOut} ⬇️</span> ${clockVal ? '(' + clockVal + "')" : ''}`;
+                        if (isHome) substitutionsListHome.push(subStr);
+                        if (isAway) substitutionsListAway.push(subStr);
                     }
                     
                     let isGoal = text.includes("goal") || text.includes("gol") || text.includes("penalty") || text.includes("pênalti") || text.includes("penal") || typeName.includes("goal") || typeName.includes("penalty") || d.scoringPlay === true;
@@ -1010,8 +1064,6 @@ dashboard_html = """
                 }
 
                 let parseNum = (val) => { let n = parseFloat(String(val).replace("%","").trim()); return isNaN(n)?0:n; };
-
-                // Extração de Defesas (Saves)
                 let hSaves = parseNum(hStats.saves || hStats.defesas || 0);
                 let aSaves = parseNum(aStats.saves || aStats.defesas || 0);
 
@@ -1118,14 +1170,11 @@ dashboard_html = """
                 let possH = hStats.possessionPct || "0%"; if(!possH.includes("%") && possH !== "0") possH += "%";
                 let possA = aStats.possessionPct || "0%"; if(!possA.includes("%") && possA !== "0") possA += "%";
 
-                let statsInnerHtml = `
-                    <p style='text-align: right;'><b>${possH}</b><br>${hStats.shotsOnTarget || '0'}<br>${hStats.totalShots || '0'}<br>${hStats.wonCorners || '0'}<br>${hStats.foulsCommitted || hStats.fouls || '0'}<br><b>${hSaves}</b><br><span class="yellow-card">🟨 ${hYellowCount}</span><br><span class="red-card">🟥 ${hRedCount}</span></p>
-                    <p style='text-align: center; color: #94a3b8;'>Posse de Bola<br>Chutes no Gol<br>Chutes Totais<br>Escanteios<br>Faltas Cometidas<br>Defesas do Goleiro<br>Cartões Amarelos<br>Cartões Vermelhos</p>
-                    <p style='text-align: left;'><b>${possA}</b><br>${aStats.shotsOnTarget || '0'}<br>${aStats.totalShots || '0'}<br>${aStats.wonCorners || '0'}<br>${aStats.foulsCommitted || aStats.fouls || '0'}<br><b>${aSaves}</b><br><span class="yellow-card">🟨 ${aYellowCount}</span><br><span class="red-card">🟥 ${aRedCount}</span></p>
-                `;
+                let hStartersHtml = hStarters.length > 0 ? hStarters.join("<br>") : "<span style='color:#64748b;'>Escalação não informada</span>";
+                let aStartersHtml = aStarters.length > 0 ? aStarters.join("<br>") : "<span style='color:#64748b;'>Escalação não informada</span>";
 
-                let hRosterHtml = hRosterList.length > 0 ? hRosterList.join("<br>") : "<span style='color:#64748b;'>Escalação não informada</span>";
-                let aRosterHtml = aRosterList.length > 0 ? aRosterList.join("<br>") : "<span style='color:#64748b;'>Escalação não informada</span>";
+                let hSubHtml = substitutionsListHome.length > 0 ? `<div style="margin-top:6px; border-top:1px dashed #334155; padding-top:4px;"><div style="font-weight:bold; color:#facc15; font-size:10px; margin-bottom:2px;">🔄 Substituições:</div>${substitutionsListHome.join("<br>")}</div>` : '';
+                let aSubHtml = substitutionsListAway.length > 0 ? `<div style="margin-top:6px; border-top:1px dashed #334155; padding-top:4px;"><div style="font-weight:bold; color:#facc15; font-size:10px; margin-bottom:2px;">🔄 Substituições:</div>${substitutionsListAway.join("<br>")}</div>` : '';
 
                 html += `
                     <div class="card">
@@ -1156,19 +1205,27 @@ dashboard_html = """
 
                         <details data-event-id="${eventId}" ${isOpen} ontoggle="openStates['${eventId}'] = this.open;">
                             <summary>📊 Estatísticas & Escalações (${homeTeam} vs ${awayTeam})</summary>
-                            <div class="stats-grid">
-                                ${statsInnerHtml}
-                            </div>
                             
-                            <div style="font-weight:bold; color:#facc15; margin-bottom:6px; font-size:12px;">📋 Escalação dos Times:</div>
-                            <div class="unified-rosters-grid">
-                                <div class="roster-box">
-                                    <div style="font-weight:bold; color:#38bdf8; margin-bottom:4px; font-size:11px; text-transform:uppercase;">${homeTeam}</div>
-                                    <div style="font-size:10px; color:#cbd5e1; line-height: 1.4;">${hRosterHtml}</div>
+                            <div class="match-details-layout">
+                                <div class="roster-panel">
+                                    <div style="font-weight:bold; color:#38bdf8; margin-bottom:6px; font-size:11px; text-transform:uppercase; text-align:center;">Titulares (${homeTeam})</div>
+                                    <div style="font-size:10px; color:#cbd5e1; line-height: 1.4;">${hStartersHtml}</div>
+                                    ${hSubHtml}
                                 </div>
-                                <div class="roster-box">
-                                    <div style="font-weight:bold; color:#f43f5e; margin-bottom:4px; font-size:11px; text-transform:uppercase;">${awayTeam}</div>
-                                    <div style="font-size:10px; color:#cbd5e1; line-height: 1.4;">${aRosterHtml}</div>
+
+                                <div class="stats-panel">
+                                    <div style="font-weight:bold; color:#facc15; margin-bottom:6px; font-size:11px; text-transform:uppercase; text-align:center;">Estatísticas</div>
+                                    <div class="stats-grid-inner">
+                                        <p style='text-align: right;'><b>${possH}</b><br>${hStats.shotsOnTarget || '0'}<br>${hStats.totalShots || '0'}<br>${hStats.wonCorners || '0'}<br>${hStats.foulsCommitted || hStats.fouls || '0'}<br><b>${hSaves}</b><br><span class="yellow-card">🟨 ${hYellowCount}</span><br><span class="red-card">🟥 ${hRedCount}</span></p>
+                                        <p style='text-align: center; color: #94a3b8;'>Posse<br>Ch. Gol<br>Ch. Tot<br>Esc.<br>Faltas<br>Def.<br>Am.<br>Verm.</p>
+                                        <p style='text-align: left;'><b>${possA}</b><br>${aStats.shotsOnTarget || '0'}<br>${aStats.totalShots || '0'}<br>${aStats.wonCorners || '0'}<br>${aStats.foulsCommitted || aStats.fouls || '0'}<br><b>${aSaves}</b><br><span class="yellow-card">🟨 ${aYellowCount}</span><br><span class="red-card">🟥 ${aRedCount}</span></p>
+                                    </div>
+                                </div>
+
+                                <div class="roster-panel">
+                                    <div style="font-weight:bold; color:#f43f5e; margin-bottom:6px; font-size:11px; text-transform:uppercase; text-align:center;">Titulares (${awayTeam})</div>
+                                    <div style="font-size:10px; color:#cbd5e1; line-height: 1.4;">${aStartersHtml}</div>
+                                    ${aSubHtml}
                                 </div>
                             </div>
                         </details>
