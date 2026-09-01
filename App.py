@@ -285,11 +285,21 @@ dashboard_html = """
         }
         .stats-grid-inner {
             display: grid;
-            grid-template-columns: 0.8fr 1.4fr 0.8fr;
-            text-align: center;
-            gap: 4px;
+            grid-template-columns: 1fr 1.6fr 1fr;
+            gap: 5px 4px;
             font-size: 11px;
             align-items: center;
+        }
+        .stat-home {
+            text-align: right;
+        }
+        .stat-label {
+            text-align: center;
+            color: #94a3b8;
+            font-size: 10px;
+        }
+        .stat-away {
+            text-align: left;
         }
         .standings-table {
             width: 100%;
@@ -1258,9 +1268,37 @@ dashboard_html = """
                                 <div class="stats-panel">
                                     <div style="font-weight:bold; color:#facc15; margin-bottom:6px; font-size:11px; text-transform:uppercase; text-align:center;">Estatísticas da Partida</div>
                                     <div class="stats-grid-inner">
-                                        <p style='text-align: right; margin: 4px 0;'><b>${possH}</b><br>${hStats.shotsOnTarget || '0'}<br>${hStats.totalShots || '0'}<br>${hStats.wonCorners || '0'}<br>${hStats.foulsCommitted || hStats.fouls || '0'}<br><b>${hSaves}</b><br><span class="yellow-card">🟨 ${hYellowCount}</span><br><span class="red-card">🟥 ${hRedCount}</span></p>
-                                        <p style='text-align: center; color: #94a3b8; margin: 4px 0; line-height: 1.6;'>Posse de Bola<br>Chutes no Gol<br>Chutes Totais<br>Escanteios<br>Faltas Cometidas<br>Defesas do Goleiro<br>Cartões Amarelos<br>Cartões Vermelhos</p>
-                                        <p style='text-align: left; margin: 4px 0;'><b>${possA}</b><br>${aStats.shotsOnTarget || '0'}<br>${aStats.totalShots || '0'}<br>${aStats.wonCorners || '0'}<br>${aStats.foulsCommitted || aStats.fouls || '0'}<br><b>${aSaves}</b><br><span class="yellow-card">🟨 ${aYellowCount}</span><br><span class="red-card">🟥 ${aRedCount}</span></p>
+                                        <div class="stat-home"><b>${possH}</b></div>
+                                        <div class="stat-label">Posse de Bola</div>
+                                        <div class="stat-away"><b>${possA}</b></div>
+
+                                        <div class="stat-home">${hStats.shotsOnTarget || '0'}</div>
+                                        <div class="stat-label">Chutes no Gol</div>
+                                        <div class="stat-away">${aStats.shotsOnTarget || '0'}</div>
+
+                                        <div class="stat-home">${hStats.totalShots || '0'}</div>
+                                        <div class="stat-label">Chutes Totais</div>
+                                        <div class="stat-away">${aStats.totalShots || '0'}</div>
+
+                                        <div class="stat-home">${hStats.wonCorners || '0'}</div>
+                                        <div class="stat-label">Escanteios</div>
+                                        <div class="stat-away">${aStats.wonCorners || '0'}</div>
+
+                                        <div class="stat-home">${hStats.foulsCommitted || hStats.fouls || '0'}</div>
+                                        <div class="stat-label">Faltas Cometidas</div>
+                                        <div class="stat-away">${aStats.foulsCommitted || aStats.fouls || '0'}</div>
+
+                                        <div class="stat-home"><b>${hSaves}</b></div>
+                                        <div class="stat-label">Defesas do Goleiro</div>
+                                        <div class="stat-away"><b>${aSaves}</b></div>
+
+                                        <div class="stat-home"><span class="yellow-card">🟨 ${hYellowCount}</span></div>
+                                        <div class="stat-label">Cartões Amarelos</div>
+                                        <div class="stat-away"><span class="yellow-card">🟨 ${aYellowCount}</span></div>
+
+                                        <div class="stat-home"><span class="red-card">🟥 ${hRedCount}</span></div>
+                                        <div class="stat-label">Cartões Vermelhos</div>
+                                        <div class="stat-away"><span class="red-card">🟥 ${aRedCount}</span></div>
                                     </div>
                                 </div>
 
