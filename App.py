@@ -354,6 +354,30 @@ dashboard_html = """
             border-radius: 6px;
             padding: 10px;
         }
+        .chart-container {
+            margin-top: 8px;
+            background: #0b0f19;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            padding: 6px;
+        }
+        .chart-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+            font-size: 10px;
+            color: #94a3b8;
+        }
+        .chart-controls select {
+            background: #1e293b;
+            color: #fff;
+            border: 1px solid #334155;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            outline: none;
+        }
     </style>
 </head>
 <body>
@@ -435,6 +459,8 @@ dashboard_html = """
         let summariesCache = {};
         let standingsCache = {};
         let openStates = {};
+        let matchHistory = {};
+        let chartTypes = {};
         let goalAlertTimer = null;
         let pollInterval = null;
         let currentLoadedStandingsKey = "";
@@ -580,6 +606,71 @@ dashboard_html = """
             goalAlertTimer = setTimeout(() => {
                 banner.style.display = "none";
             }, 10000);
+        }
+
+        function renderChartSvg(eventId, hTeamName, aTeamName) {
+            let history = matchHistory[eventId] || {};
+            let minutes = Object.keys(history).map(Number).sort((a,b) => a - b);
+            let cType = chartTypes[eventId] || 'line';
+
+            let width = 500;
+            let height = 80;
+
+            if (minutes.length === 0) {
+                return `<div style="text-align:center; color:#64748b; font-size:10px; padding:20px;">Aguardando dados minuto a minuto...</div>`;
+            }
+
+            let svg = `<svg viewBox="0 0 ${width} ${height}" style="width:100%; height:${height}px; overflow:visible;">`;
+            
+            svg += `<line x1="0" y1="20" x2="${width}" y2="20" stroke="#1e293b" stroke-width="1" />`;
+            svg += `<line x1="0" y1="40" x2="${width}" y2="40" stroke="#1e293b" stroke-width="1" stroke-dasharray="2,2"/>`;
+            svg += `<line x1="0" y1="60" x2="${width}" y2="60" stroke="#1e293b" stroke-width="1" />`;
+
+            let minM = minutes[0];
+            let maxM = Math.max(...minutes, 90);
+            let spanM = maxM - minM || 1;
+
+            if (cType === 'line') {
+                let points = [];
+                minutes.forEach((m, idx) => {
+                    let val = history[m].close;
+                    let x = (idx / (minutes.length > 1 ? minutes.length - 1 : 1)) * (width - 20) + 10;
+                    let y = height - (val / 100) * (height - 15) - 5;
+                    points.push(`${x},${y}`);
+                });
+
+                if (points.length > 1) {
+                    svg += `<polyline fill="none" stroke="#38bdf8" stroke-width="2" points="${points.join(' ')}" />`;
+                }
+                minutes.forEach((m, idx) => {
+                    let val = history[m].close;
+                    let x = (idx / (minutes.length > 1 ? minutes.length - 1 : 1)) * (width - 20) + 10;
+                    let y = height - (val / 100) * (height - 15) - 5;
+                    svg += `<circle cx="${x}" cy="${y}" r="2.5" fill="#facc15" />`;
+                });
+            } else {
+                let candleWidth = Math.max(3, Math.min(12, (width / minutes.length) - 4));
+                minutes.forEach((m, idx) => {
+                    let c = history[m];
+                    let x = (idx / (minutes.length > 1 ? minutes.length - 1 : 1)) * (width - 40) + 20;
+                    
+                    let yHigh = height - (c.high / 100) * (height - 15) - 5;
+                    let yLow = height - (c.low / 100) * (height - 15) - 5;
+                    let yOpen = height - (c.open / 100) * (height - 15) - 5;
+                    let yClose = height - (c.close / 100) * (height - 15) - 5;
+
+                    let isGreen = c.close >= c.open;
+                    let color = isGreen ? '#22c55e' : '#ef4444';
+                    let rectY = Math.min(yOpen, yClose);
+                    let rectH = Math.max(2, Math.abs(yClose - yOpen));
+
+                    svg += `<line x1="${x}" y1="${yHigh}" x2="${x}" y2="${yLow}" stroke="${color}" stroke-width="1.5" />`;
+                    svg += `<rect x="${x - candleWidth/2}" y="${rectY}" width="${candleWidth}" height="${rectH}" fill="${color}" rx="1" />`;
+                });
+            }
+
+            svg += `</svg>`;
+            return svg;
         }
 
         async function fetchStandings() {
@@ -912,7 +1003,6 @@ dashboard_html = """
                     }
                 }
 
-                // Extração de Titulares
                 if (summary.rosters) {
                     summary.rosters.forEach(r => {
                         let isHome = r.team && r.team.id === homeTeamId;
@@ -988,24 +1078,18 @@ dashboard_html = """
                         }
                     }
 
-                    // Detecção Robusta de Substituições (Entra e Sai)
                     let isSub = text.includes("substitution") || text.includes("substituição") || typeName.includes("sub") || text.includes("sub");
                     if (isSub) {
                         let playerIn = "";
                         let playerOut = "";
 
-                        // Tentativa 1: athletesInvolved (geralmente [0] = entra, [1] = sai)
                         if (d.athletesInvolved && d.athletesInvolved.length >= 2) {
                             playerIn = d.athletesInvolved[0].displayName || d.athletesInvolved[0].name || "";
                             playerOut = d.athletesInvolved[1].displayName || d.athletesInvolved[1].name || "";
-                        } 
-                        // Tentativa 2: participants
-                        else if (d.participants && d.participants.length >= 2) {
+                        } else if (d.participants && d.participants.length >= 2) {
                             playerIn = d.participants[0].athlete?.displayName || d.participants[0].name || "";
                             playerOut = d.participants[1].athlete?.displayName || d.participants[1].name || "";
-                        }
-                        // Tentativa 3: text parsing caso venha no formato "Entra: X / Sai: Y" ou texto livre
-                        else if (d.text) {
+                        } else if (d.text) {
                             let parts = d.text.split('/');
                             if (parts.length >= 2) {
                                 playerIn = parts[0].replace(/[^a-zA-Zá-úÁ-Ú\s]/g, '').trim();
@@ -1173,6 +1257,19 @@ dashboard_html = """
                 let hPct = totalPress === 0 ? 50 : Math.round((hScorePress / totalPress) * 100);
                 let aPct = 100 - hPct;
 
+                if (state === 'in') {
+                    let currentMin = parseInt(displayClock) || (period === 1 ? 25 : 70);
+                    if (!matchHistory[eventId]) matchHistory[eventId] = {};
+                    if (!matchHistory[eventId][currentMin]) {
+                        matchHistory[eventId][currentMin] = { open: hPct, high: hPct, low: hPct, close: hPct };
+                    } else {
+                        let c = matchHistory[eventId][currentMin];
+                        c.high = Math.max(c.high, hPct);
+                        c.low = Math.min(c.low, hPct);
+                        c.close = hPct;
+                    }
+                }
+
                 let getBarColor = (pct) => pct > 65 ? "#22c55e" : (pct > 51 ? "#f97316" : (pct >= 35 ? "#ffffff" : "#ef4444"));
                 let getBarLabel = (pct) => pct > 65 ? "Pressão Alta" : (pct > 51 ? "Pressão Moderada" : (pct >= 35 ? "Neutro" : "Defensiva / Baixa"));
 
@@ -1228,6 +1325,9 @@ dashboard_html = """
                 let hSubHtml = substitutionsListHome.length > 0 ? `<div style="margin-top:6px; border-top:1px dashed #334155; padding-top:4px;"><div style="font-weight:bold; color:#facc15; font-size:10px; margin-bottom:2px;">🔄 Substituições:</div>${substitutionsListHome.join("<br>")}</div>` : '';
                 let aSubHtml = substitutionsListAway.length > 0 ? `<div style="margin-top:6px; border-top:1px dashed #334155; padding-top:4px;"><div style="font-weight:bold; color:#facc15; font-size:10px; margin-bottom:2px;">🔄 Substituições:</div>${substitutionsListAway.join("<br>")}</div>` : '';
 
+                let activeChartType = chartTypes[eventId] || 'line';
+                let chartSvgContent = renderChartSvg(eventId, homeTeam, awayTeam);
+
                 html += `
                     <div class="card">
                         <div class="header-league">🏆 Campeonato: ${lName}</div>
@@ -1253,6 +1353,20 @@ dashboard_html = """
                                     <div class="pressure-track"><div class="pressure-fill" style="background-color: ${getBarColor(aPct)}; width: ${aPct}%;"></div></div>
                                 </div>
                             </div>
+                        </div>
+
+                        <div class="chart-container">
+                            <div class="chart-controls">
+                                <span>📈 Força/Pressão Minuto a Minuto (${homeTeam})</span>
+                                <div>
+                                    <label>Estilo:</label>
+                                    <select onchange="chartTypes['${eventId}'] = this.value; fetchAllData();">
+                                        <option value="line" ${activeChartType==='line'?'selected':''}>Linha</option>
+                                        <option value="candle" ${activeChartType==='candle'?'selected':''}>Candlestick (Mercado)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            ${chartSvgContent}
                         </div>
 
                         <details data-event-id="${eventId}" ${isOpen} ontoggle="openStates['${eventId}'] = this.open;">
@@ -1330,4 +1444,4 @@ dashboard_html = """
 </html>
 """
 
-st.components.v1.html(dashboard_html, height=1250, scrolling=True)
+st.components.v1.html(dashboard_html, height=1350, scrolling=True)
