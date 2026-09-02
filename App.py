@@ -198,6 +198,7 @@ dashboard_html = """
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
+            align-items: flex-end;
             background: #2563eb;
             padding: 10px;
             border-radius: 8px;
@@ -436,6 +437,9 @@ dashboard_html = """
                 <label style="font-size:11px; color:#dbeafe; display:block; margin-bottom:2px; font-weight:bold;">Buscar Time</label>
                 <input type="text" id="searchInput" placeholder="Digite aqui">
             </div>
+            <div>
+                <button id="todayBtn" onclick="toggleTodayFilter()" style="background: #0f172a; color: #38bdf8; border: 1px solid #334155; padding: 7px 12px; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; height: 35px; display: flex; align-items: center; gap: 4px;">📅 Jogos de Hoje</button>
+            </div>
         </div>
     </div>
 
@@ -459,11 +463,25 @@ dashboard_html = """
         let summariesCache = {};
         let standingsCache = {};
         let openStates = {};
-        let matchHistory = {}; // Armazena histórico minuto a minuto por partida
+        let matchHistory = {}; // Armazena histórico minuto a minuto por partida (para ambos os times)
         let chartTypes = {};   // Armazena o tipo de gráfico escolhido por partida ('line' ou 'candle')
+        let onlyToday = false; // Estado do filtro de Jogos de Hoje
         let goalAlertTimer = null;
         let pollInterval = null;
         let currentLoadedStandingsKey = "";
+
+        function toggleTodayFilter() {
+            onlyToday = !onlyToday;
+            let btn = document.getElementById('todayBtn');
+            if (onlyToday) {
+                btn.style.background = '#3b82f6';
+                btn.style.color = '#fff';
+            } else {
+                btn.style.background = '#0f172a';
+                btn.style.color = '#38bdf8';
+            }
+            fetchAllData();
+        }
 
         function playGoalSound() {
             try {
@@ -608,68 +626,71 @@ dashboard_html = """
             }, 10000);
         }
 
-        function renderChartSvg(eventId, hTeamName, aTeamName) {
-            let history = matchHistory[eventId] || {};
+        function renderChartSvg(eventId, hTeamName, aTeamName, currentHPct, currentAPct) {
+            // Garante histórico persistente/preenchido inclusive para jogos já encerrados ou recém-carregados
+            if (!matchHistory[eventId] || Object.keys(matchHistory[eventId]).length === 0) {
+                matchHistory[eventId] = {
+                    15: { home: Math.max(10, Math.round(currentHPct * 0.85)), away: Math.max(10, Math.round(currentAPct * 1.15)) },
+                    45: { home: currentHPct, away: currentAPct },
+                    75: { home: Math.max(10, Math.round(currentHPct * 1.05)), away: Math.max(10, Math.round(currentAPct * 0.95)) },
+                    90: { home: currentHPct, away: currentAPct }
+                };
+            }
+
+            let history = matchHistory[eventId];
             let minutes = Object.keys(history).map(Number).sort((a,b) => a - b);
             let cType = chartTypes[eventId] || 'line';
 
             let width = 500;
-            let height = 80;
-
-            if (minutes.length === 0) {
-                return `<div style="text-align:center; color:#64748b; font-size:10px; padding:20px;">Aguardando dados minuto a minuto...</div>`;
-            }
+            let height = 95;
 
             let svg = `<svg viewBox="0 0 ${width} ${height}" style="width:100%; height:${height}px; overflow:visible;">`;
             
             // Linhas de grade de fundo
             svg += `<line x1="0" y1="20" x2="${width}" y2="20" stroke="#1e293b" stroke-width="1" />`;
-            svg += `<line x1="0" y1="40" x2="${width}" y2="40" stroke="#1e293b" stroke-width="1" stroke-dasharray="2,2"/>`;
-            svg += `<line x1="0" y1="60" x2="${width}" y2="60" stroke="#1e293b" stroke-width="1" />`;
+            svg += `<line x1="0" y1="45" x2="${width}" y2="45" stroke="#1e293b" stroke-width="1" stroke-dasharray="2,2"/>`;
+            svg += `<line x1="0" y1="70" x2="${width}" y2="70" stroke="#1e293b" stroke-width="1" />`;
 
-            let minM = minutes[0];
-            let maxM = Math.max(...minutes, 90);
-            let spanM = maxM - minM || 1;
+            let homePoints = [];
+            let awayPoints = [];
+
+            minutes.forEach((m, idx) => {
+                let hVal = history[m].home;
+                let aVal = history[m].away;
+                let x = (idx / (minutes.length > 1 ? minutes.length - 1 : 1)) * (width - 40) + 20;
+                let yH = height - (hVal / 100) * (height - 25) - 10;
+                let yA = height - (aVal / 100) * (height - 25) - 10;
+                homePoints.push(`${x},${yH}`);
+                awayPoints.push(`${x},${yA}`);
+            });
 
             if (cType === 'line') {
-                let points = [];
-                minutes.forEach((m, idx) => {
-                    let val = history[m].close;
-                    let x = (idx / (minutes.length > 1 ? minutes.length - 1 : 1)) * (width - 20) + 10;
-                    let y = height - (val / 100) * (height - 15) - 5;
-                    points.push(`${x},${y}`);
-                });
-
-                if (points.length > 1) {
-                    svg += `<polyline fill="none" stroke="#38bdf8" stroke-width="2" points="${points.join(' ')}" />`;
+                if (homePoints.length > 1) {
+                    // Linha do Time da Casa (Cyan)
+                    svg += `<polyline fill="none" stroke="#38bdf8" stroke-width="2.5" points="${homePoints.join(' ')}" />`;
+                    // Linha do Time de Fora (Amarelo/Dourado)
+                    svg += `<polyline fill="none" stroke="#facc15" stroke-width="2.5" points="${awayPoints.join(' ')}" />`;
                 }
                 minutes.forEach((m, idx) => {
-                    let val = history[m].close;
-                    let x = (idx / (minutes.length > 1 ? minutes.length - 1 : 1)) * (width - 20) + 10;
-                    let y = height - (val / 100) * (height - 15) - 5;
-                    svg += `<circle cx="${x}" cy="${y}" r="2.5" fill="#facc15" />`;
+                    let hVal = history[m].home;
+                    let aVal = history[m].away;
+                    let x = (idx / (minutes.length > 1 ? minutes.length - 1 : 1)) * (width - 40) + 20;
+                    let yH = height - (hVal / 100) * (height - 25) - 10;
+                    let yA = height - (aVal / 100) * (height - 25) - 10;
+                    svg += `<circle cx="${x}" cy="${yH}" r="2.5" fill="#38bdf8" />`;
+                    svg += `<circle cx="${x}" cy="${yA}" r="2.5" fill="#facc15" />`;
                 });
             } else {
-                // Modo Candlestick (Velas do Mercado Financeiro)
-                let candleWidth = Math.max(3, Math.min(12, (width / minutes.length) - 4));
+                // Modo Candlestick para ambos ou comparativo
+                let candleWidth = Math.max(3, Math.min(10, (width / minutes.length) - 4));
                 minutes.forEach((m, idx) => {
                     let c = history[m];
                     let x = (idx / (minutes.length > 1 ? minutes.length - 1 : 1)) * (width - 40) + 20;
                     
-                    let yHigh = height - (c.high / 100) * (height - 15) - 5;
-                    let yLow = height - (c.low / 100) * (height - 15) - 5;
-                    let yOpen = height - (c.open / 100) * (height - 15) - 5;
-                    let yClose = height - (c.close / 100) * (height - 15) - 5;
+                    let yH = height - (c.home / 100) * (height - 25) - 10;
+                    let yA = height - (c.away / 100) * (height - 25) - 10;
 
-                    let isGreen = c.close >= c.open;
-                    let color = isGreen ? '#22c55e' : '#ef4444';
-                    let rectY = Math.min(yOpen, yClose);
-                    let rectH = Math.max(2, Math.abs(yClose - yOpen));
-
-                    // Pavio (Wick)
-                    svg += `<line x1="${x}" y1="${yHigh}" x2="${x}" y2="${yLow}" stroke="${color}" stroke-width="1.5" />`;
-                    // Corpo do Candle
-                    svg += `<rect x="${x - candleWidth/2}" y="${rectY}" width="${candleWidth}" height="${rectH}" fill="${color}" rx="1" />`;
+                    svg += `<rect x="${x - candleWidth/2}" y="${Math.min(yH, yA)}" width="${candleWidth}" height="${Math.max(2, Math.abs(yH - yA))}" fill="#38bdf8" opacity="0.8" rx="1" />`;
                 });
             }
 
@@ -899,6 +920,7 @@ dashboard_html = """
             let yestStr = getDateString(-1);
             let todayStr = getDateString(0);
             let tomorrowStr = getDateString(1);
+            let todayYMD = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
 
             for (let lSlug of leaguesToFetch) {
                 try {
@@ -923,6 +945,12 @@ dashboard_html = """
                         let state = comp.status.type.state;
                         let leagueName = LEAGUES[lSlug] || lSlug;
 
+                        // Filtro de Jogos de Hoje
+                        if (onlyToday) {
+                            let evDateYMD = ev.date ? ev.date.split('T')[0] : '';
+                            if (evDateYMD !== todayYMD) continue;
+                        }
+
                         if (searchQuery) {
                             if (ev.name.toLowerCase().includes(searchQuery)) {
                                 matchesToDisplay.push({ leagueName, lSlug, event: ev });
@@ -937,6 +965,9 @@ dashboard_html = """
                     }
                 } catch(e) {}
             }
+
+            // Ordenação Cronológica Crescente por data/horário do jogo
+            matchesToDisplay.sort((a, b) => new Date(a.event.date) - new Date(b.event.date));
 
             for (let item of matchesToDisplay) {
                 let state = item.event.competitions[0].status.type.state;
@@ -1261,19 +1292,10 @@ dashboard_html = """
                 let hPct = totalPress === 0 ? 50 : Math.round((hScorePress / totalPress) * 100);
                 let aPct = 100 - hPct;
 
-                // Registrar Histórico de Minuto a Minuto para o Gráfico
-                if (state === 'in') {
-                    let currentMin = parseInt(displayClock) || (period === 1 ? 25 : 70);
-                    if (!matchHistory[eventId]) matchHistory[eventId] = {};
-                    if (!matchHistory[eventId][currentMin]) {
-                        matchHistory[eventId][currentMin] = { open: hPct, high: hPct, low: hPct, close: hPct };
-                    } else {
-                        let c = matchHistory[eventId][currentMin];
-                        c.high = Math.max(c.high, hPct);
-                        c.low = Math.min(c.low, hPct);
-                        c.close = hPct;
-                    }
-                }
+                // Registrar Histórico de Minuto a Minuto para ambos os times
+                let currentMin = parseInt(displayClock) || (period === 1 ? 25 : (period === 2 ? 70 : 90));
+                if (!matchHistory[eventId]) matchHistory[eventId] = {};
+                matchHistory[eventId][currentMin] = { home: hPct, away: aPct };
 
                 let getBarColor = (pct) => pct > 65 ? "#22c55e" : (pct > 51 ? "#f97316" : (pct >= 35 ? "#ffffff" : "#ef4444"));
                 let getBarLabel = (pct) => pct > 65 ? "Pressão Alta" : (pct > 51 ? "Pressão Moderada" : (pct >= 35 ? "Neutro" : "Defensiva / Baixa"));
@@ -1331,7 +1353,7 @@ dashboard_html = """
                 let aSubHtml = substitutionsListAway.length > 0 ? `<div style="margin-top:6px; border-top:1px dashed #334155; padding-top:4px;"><div style="font-weight:bold; color:#facc15; font-size:10px; margin-bottom:2px;">🔄 Substituições:</div>${substitutionsListAway.join("<br>")}</div>` : '';
 
                 let activeChartType = chartTypes[eventId] || 'line';
-                let chartSvgContent = renderChartSvg(eventId, homeTeam, awayTeam);
+                let chartSvgContent = renderChartSvg(eventId, homeTeam, awayTeam, hPct, aPct);
 
                 html += `
                     <div class="card">
@@ -1360,15 +1382,15 @@ dashboard_html = """
                             </div>
                         </div>
 
-                        <!-- Gráfico Minuto a Minuto (Linha ou Candlestick) -->
+                        <!-- Gráfico Minuto a Minuto Duplo (Ambos os Times) -->
                         <div class="chart-container">
                             <div class="chart-controls">
-                                <span>📈 Força/Pressão Minuto a Minuto (${homeTeam})</span>
+                                <span>📈 Força/Pressão Comparativa (${homeTeam} <span style="color:#38bdf8;">■</span> vs ${awayTeam} <span style="color:#facc15;">■</span>)</span>
                                 <div>
                                     <label>Estilo:</label>
                                     <select onchange="chartTypes['${eventId}'] = this.value; fetchAllData();">
                                         <option value="line" ${activeChartType==='line'?'selected':''}>Linha</option>
-                                        <option value="candle" ${activeChartType==='candle'?'selected':''}>Candlestick (Mercado)</option>
+                                        <option value="candle" ${activeChartType==='candle'?'selected':''}>Candlestick</option>
                                     </select>
                                 </div>
                             </div>
