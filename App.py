@@ -411,7 +411,7 @@ dashboard_html = """
                     <option value="all_live">🟢 Todos os Jogos ao Vivo (Global)</option>
                     <option value="bra.1">🇧🇷 Brasileirão Série A</option>
                     <option value="bra.2">🇧🇷 Brasileirão Série B</option>
-                    <option value="bra.copa_do_brazil">🇧🇷 Copa do Brasil</option>
+                    <option value="bra.copa_brasil">🇧🇷 Copa do Brasil</option>
                     <option value="conmebol.libertadores">🌎 Copa Libertadores</option>
                     <option value="conmebol.sudamericana">🌎 Copa Sudamericana</option>
                     <option value="uefa.champions">🇪🇺 Champions League</option>
@@ -447,14 +447,29 @@ dashboard_html = """
 
     <script>
         const LEAGUES = {
-            "bra.1": "Brasileirão Série A", "bra.2": "Brasileirão Série B", "bra.copa_do_brazil": "Copa do Brasil",
-            "conmebol.libertadores": "Copa Libertadores", "conmebol.sudamericana": "Copa Sudamericana",
-            "uefa.champions": "Champions League", "uefa.europa": "Europa League",
-            "eng.1": "Premier League", "esp.1": "La Liga", "ita.1": "Serie A (Itália)", "ger.1": "Bundesliga",
-            "fra.1": "Ligue 1", "por.1": "Primeira Liga", "ksa.1": "Saudi Pro League",
-            "arg.1": "Liga Profesional", "mex.1": "Liga MX", "col.1": "Campeonato Colombiano",
-            "ecu.1": "Campeonato do Equador", "chi.1": "Liga Chilena", "ned.1": "Eredivisie",
-            "usa.1": "MLS", "fifa.friendly": "Jogos Internacionais"
+            "bra.1": "Brasileirão Série A", 
+            "bra.2": "Brasileirão Série B", 
+            "bra.copa_brasil": "Copa do Brasil",
+            "bra.copa_do_brazil": "Copa do Brasil",
+            "conmebol.libertadores": "Copa Libertadores", 
+            "conmebol.sudamericana": "Copa Sudamericana",
+            "uefa.champions": "Champions League", 
+            "uefa.europa": "Europa League",
+            "eng.1": "Premier League", 
+            "esp.1": "La Liga", 
+            "ita.1": "Serie A (Itália)", 
+            "ger.1": "Bundesliga",
+            "fra.1": "Ligue 1", 
+            "por.1": "Primeira Liga", 
+            "ksa.1": "Saudi Pro League",
+            "arg.1": "Liga Profesional", 
+            "mex.1": "Liga MX", 
+            "col.1": "Campeonato Colombiano",
+            "ecu.1": "Campeonato do Equador", 
+            "chi.1": "Liga Chilena", 
+            "ned.1": "Eredivisie",
+            "usa.1": "MLS", 
+            "fifa.friendly": "Jogos Internacionais"
         };
 
         let matchScores = {};
@@ -557,7 +572,10 @@ dashboard_html = """
             let yestStr = getDateString(-1);
             let todayStr = getDateString(0);
 
-            for (let lSlug of Object.keys(LEAGUES)) {
+            // Coleta de slugs únicos (evita duplicidade no ticker por causa de aliases)
+            let uniqueSlugs = [...new Set(Object.keys(LEAGUES))];
+
+            for (let lSlug of uniqueSlugs) {
                 try {
                     let [resYest, resToday] = await Promise.all([
                         fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard?dates=${yestStr}`),
@@ -709,7 +727,7 @@ dashboard_html = """
 
             mainContainer.innerHTML = "<div style='text-align:center; color:#94a3b8; padding:20px;'>Carregando classificação e chaveamentos...</div>";
 
-            let isCup = lSlug.includes('copa_do_brazil') || lSlug.includes('copa_brasil') || lSlug.includes('libertadores') || lSlug.includes('sudamericana') || lSlug.includes('champions') || lSlug.includes('europa') || lSlug.includes('friendly');
+            let isCup = lSlug.includes('copa_brasil') || lSlug.includes('copa_do_brazil') || lSlug.includes('libertadores') || lSlug.includes('sudamericana') || lSlug.includes('champions') || lSlug.includes('europa') || lSlug.includes('friendly');
 
             if (isCup) {
                 try {
@@ -763,15 +781,12 @@ dashboard_html = """
                                 let ev = item.ev;
                                 let comp = item.comp;
                                 let hTeam = "Casa", aTeam = "Fora", hScore = "0", aScore = "0";
-                                let hId = "", aId = "";
                                 for (let c of comp.competitors) {
                                     if (c.homeAway === 'home') {
                                         hTeam = c.team.displayName || c.team.shortDisplayName;
-                                        hId = c.team.id;
                                         hScore = c.score;
                                     } else {
                                         aTeam = c.team.displayName || c.team.shortDisplayName;
-                                        aId = c.team.id;
                                         aScore = c.score;
                                     }
                                 }
@@ -932,7 +947,14 @@ dashboard_html = """
             let searchQuery = document.getElementById('searchInput').value.toLowerCase().trim();
             
             let matchesToDisplay = [];
-            let leaguesToFetch = selectedLeague === 'all_live' ? Object.keys(LEAGUES) : [selectedLeague];
+            
+            // CORREÇÃO CRUCIAL: Se "Jogos de Hoje" estiver ativo, varre TODAS as ligas e copas (removendo duplicatas de slugs)
+            let leaguesToFetch = [];
+            if (onlyToday) {
+                leaguesToFetch = [...new Set(Object.keys(LEAGUES))];
+            } else {
+                leaguesToFetch = selectedLeague === 'all_live' ? [...new Set(Object.keys(LEAGUES))] : [selectedLeague];
+            }
 
             let yestStr = getDateString(-1);
             let todayStr = getDateString(0);
@@ -980,6 +1002,11 @@ dashboard_html = """
                     }
                 } catch(e) {}
             }
+
+            // Remove eventos duplicados (caso a mesma partida venha por diferentes aliases de slugs)
+            let uniqueMatchMap = {};
+            matchesToDisplay.forEach(m => uniqueMatchMap[m.event.id] = m);
+            matchesToDisplay = Object.values(uniqueMatchMap);
 
             matchesToDisplay.sort((a, b) => new Date(a.event.date) - new Date(b.event.date));
 
