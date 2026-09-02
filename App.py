@@ -463,11 +463,12 @@ dashboard_html = """
         let summariesCache = {};
         let standingsCache = {};
         let openStates = {};
-        let matchHistory = {}; // Armazena histórico minuto a minuto por partida (para ambos os times)
-        let chartTypes = {};   // Armazena o tipo de gráfico escolhido por partida ('line' ou 'candle')
-        let onlyToday = false; // Estado do filtro de Jogos de Hoje
+        let matchHistory = {}; 
+        let chartTypes = {};   
+        let onlyToday = false; 
         let goalAlertTimer = null;
         let pollInterval = null;
+        let tickerInterval = null;
         let currentLoadedStandingsKey = "";
 
         function toggleTodayFilter() {
@@ -627,7 +628,6 @@ dashboard_html = """
         }
 
         function renderChartSvg(eventId, hTeamName, aTeamName, currentHPct, currentAPct) {
-            // Garante histórico persistente/preenchido inclusive para jogos já encerrados ou recém-carregados
             if (!matchHistory[eventId] || Object.keys(matchHistory[eventId]).length === 0) {
                 matchHistory[eventId] = {
                     15: { home: Math.max(10, Math.round(currentHPct * 0.85)), away: Math.max(10, Math.round(currentAPct * 1.15)) },
@@ -646,7 +646,6 @@ dashboard_html = """
 
             let svg = `<svg viewBox="0 0 ${width} ${height}" style="width:100%; height:${height}px; overflow:visible;">`;
             
-            // Linhas de grade de fundo
             svg += `<line x1="0" y1="20" x2="${width}" y2="20" stroke="#1e293b" stroke-width="1" />`;
             svg += `<line x1="0" y1="45" x2="${width}" y2="45" stroke="#1e293b" stroke-width="1" stroke-dasharray="2,2"/>`;
             svg += `<line x1="0" y1="70" x2="${width}" y2="70" stroke="#1e293b" stroke-width="1" />`;
@@ -666,9 +665,7 @@ dashboard_html = """
 
             if (cType === 'line') {
                 if (homePoints.length > 1) {
-                    // Linha do Time da Casa (Cyan)
                     svg += `<polyline fill="none" stroke="#38bdf8" stroke-width="2.5" points="${homePoints.join(' ')}" />`;
-                    // Linha do Time de Fora (Amarelo/Dourado)
                     svg += `<polyline fill="none" stroke="#facc15" stroke-width="2.5" points="${awayPoints.join(' ')}" />`;
                 }
                 minutes.forEach((m, idx) => {
@@ -681,7 +678,6 @@ dashboard_html = """
                     svg += `<circle cx="${x}" cy="${yA}" r="2.5" fill="#facc15" />`;
                 });
             } else {
-                // Modo Candlestick para ambos ou comparativo
                 let candleWidth = Math.max(3, Math.min(10, (width / minutes.length) - 4));
                 minutes.forEach((m, idx) => {
                     let c = history[m];
@@ -898,17 +894,10 @@ dashboard_html = """
             if (viewMode === 'standings') {
                 searchContainer.style.display = 'none';
                 document.getElementById('tickerContainer').style.display = 'none';
-                if (pollInterval) {
-                    clearInterval(pollInterval);
-                    pollInterval = null;
-                }
                 await fetchStandings();
                 return;
             } else {
                 searchContainer.style.display = 'block';
-                if (!pollInterval) {
-                    pollInterval = setInterval(fetchAllData, 2000);
-                }
             }
 
             let selectedLeague = document.getElementById('leagueSelect').value;
@@ -920,7 +909,7 @@ dashboard_html = """
             let yestStr = getDateString(-1);
             let todayStr = getDateString(0);
             let tomorrowStr = getDateString(1);
-            let todayYMD = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+            let todayYMD = new Date().toLocaleDateString('en-CA'); 
 
             for (let lSlug of leaguesToFetch) {
                 try {
@@ -945,7 +934,6 @@ dashboard_html = """
                         let state = comp.status.type.state;
                         let leagueName = LEAGUES[lSlug] || lSlug;
 
-                        // Filtro de Jogos de Hoje
                         if (onlyToday) {
                             let evDateYMD = ev.date ? ev.date.split('T')[0] : '';
                             if (evDateYMD !== todayYMD) continue;
@@ -966,7 +954,6 @@ dashboard_html = """
                 } catch(e) {}
             }
 
-            // Ordenação Cronológica Crescente por data/horário do jogo
             matchesToDisplay.sort((a, b) => new Date(a.event.date) - new Date(b.event.date));
 
             for (let item of matchesToDisplay) {
@@ -974,8 +961,6 @@ dashboard_html = """
                 let isLiveMatch = (state === 'in' || item.event.competitions[0].status.type.name === 'STATUS_HALFTIME');
                 await asyncizedFetchSummary(item.lSlug, item.event.id, isLiveMatch);
             }
-
-            updateGlobalTicker();
 
             let mainContainer = document.getElementById('mainContainer');
             if (matchesToDisplay.length === 0) {
@@ -1292,7 +1277,6 @@ dashboard_html = """
                 let hPct = totalPress === 0 ? 50 : Math.round((hScorePress / totalPress) * 100);
                 let aPct = 100 - hPct;
 
-                // Registrar Histórico de Minuto a Minuto para ambos os times
                 let currentMin = parseInt(displayClock) || (period === 1 ? 25 : (period === 2 ? 70 : 90));
                 if (!matchHistory[eventId]) matchHistory[eventId] = {};
                 matchHistory[eventId][currentMin] = { home: hPct, away: aPct };
@@ -1382,7 +1366,6 @@ dashboard_html = """
                             </div>
                         </div>
 
-                        <!-- Gráfico Minuto a Minuto Duplo (Ambos os Times) -->
                         <div class="chart-container">
                             <div class="chart-controls">
                                 <span>📈 Força/Pressão Comparativa (${homeTeam} <span style="color:#38bdf8;">■</span> vs ${awayTeam} <span style="color:#facc15;">■</span>)</span>
@@ -1465,8 +1448,15 @@ dashboard_html = """
         });
         document.getElementById('searchInput').addEventListener('input', fetchAllData);
 
+        // Inicialização e intervalos otimizados
         fetchAllData();
-        pollInterval = setInterval(fetchAllData, 2000);
+        updateGlobalTicker();
+
+        // Partidas atualizam a cada 10s (evita rate limit)
+        pollInterval = setInterval(fetchAllData, 10000);
+        
+        // Ticker global atualiza a cada 45s de forma independente
+        tickerInterval = setInterval(updateGlobalTicker, 45000);
     </script>
 </body>
 </html>
