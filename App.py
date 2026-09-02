@@ -153,11 +153,6 @@ dashboard_html = """
             font-size: 10px;
             font-weight: bold;
         }
-        .venue-text {
-            font-size: 10px;
-            color: #94a3b8;
-            margin-top: 2px;
-        }
         .yellow-card {
             background-color: #eab308;
             color: #000;
@@ -379,6 +374,27 @@ dashboard_html = """
             font-size: 10px;
             outline: none;
         }
+        .compact-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #1e293b;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #334155;
+        }
+        .compact-table th, .compact-table td {
+            padding: 10px 12px;
+            text-align: left;
+            font-size: 13px;
+        }
+        .compact-table th {
+            background-color: #0f172a;
+            color: #38bdf8;
+            font-weight: bold;
+        }
+        .compact-table tr:nth-child(even) {
+            background-color: #162032;
+        }
     </style>
 </head>
 <body>
@@ -401,7 +417,8 @@ dashboard_html = """
             <div>
                 <label style="font-size:11px; color:#dbeafe; display:block; margin-bottom:2px; font-weight:bold;">Visualização</label>
                 <select id="viewSelect">
-                    <option value="matches">⚽ Partidas & Jogos</option>
+                    <option value="matches">⚽ Cards Completos</option>
+                    <option value="compact">📜 Lista Compacta (Sem Poluição)</option>
                     <option value="standings">📊 Classificação</option>
                 </select>
             </div>
@@ -967,6 +984,77 @@ dashboard_html = """
                 return;
             }
 
+            if (viewMode === 'compact') {
+                let compactHtml = `
+                    <table class="compact-table">
+                        <thead>
+                            <tr>
+                                <th>Status / Minuto</th>
+                                <th style="text-align: right;">Time da Casa</th>
+                                <th style="text-align: center;">Placar</th>
+                                <th>Time Visitante</th>
+                                <th>Campeonato</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                for (let item of matchesToDisplay) {
+                    let ev = item.event;
+                    let lName = item.leagueName;
+                    let competition = ev.competitions[0];
+                    let competitors = competition.competitors;
+
+                    let homeTeam = "Casa", awayTeam = "Fora";
+                    let homeScore = "0", awayScore = "0";
+
+                    for (let c of competitors) {
+                        if (c.homeAway === 'home') {
+                            homeTeam = c.team.displayName || c.team.shortDisplayName;
+                            homeScore = c.score;
+                        } else {
+                            awayTeam = c.team.displayName || c.team.shortDisplayName;
+                            awayScore = c.score;
+                        }
+                    }
+
+                    let state = competition.status.type.state;
+                    let statusName = competition.status.type.name || "";
+                    let rawDetail = competition.status.type.detail || "";
+                    let displayClock = competition.status.displayClock || "";
+                    let period = competition.status.period || 1;
+
+                    let statusBadge = "";
+                    let isHalftime = (statusName === 'STATUS_HALFTIME' || rawDetail.toLowerCase().includes('halftime') || rawDetail.toLowerCase().includes('intervalo'));
+
+                    if (isHalftime) {
+                        statusBadge = `<span style="color: #eab308; font-weight: bold;">⏸️ Intervalo</span>`;
+                    } else if (state === 'in') {
+                        let pName = period === 1 ? "1ºT" : (period === 2 ? "2ºT" : "Pr.");
+                        let clockDisp = displayClock ? ` (${displayClock}')` : "";
+                        statusBadge = `<span style="color: #22c55e; font-weight: bold;"><span class="blinking-dot"></span>${pName}${clockDisp}</span>`;
+                    } else if (state === 'post') {
+                        statusBadge = `<span style="color: #94a3b8; font-weight: bold;">Encerrado</span>`;
+                    } else {
+                        statusBadge = `<span style="color: #38bdf8;">🕒 ${formatDateBrasilia(ev.date)}</span>`;
+                    }
+
+                    compactHtml += `
+                        <tr>
+                            <td>${statusBadge}</td>
+                            <td style="text-align: right; font-weight: bold;">${homeTeam}</td>
+                            <td style="text-align: center;"><span style="background-color: #0f172a; padding: 3px 8px; border-radius: 4px; border: 1px solid #334155; font-weight: bold;">${homeScore} x ${awayScore}</span></td>
+                            <td style="font-weight: bold;">${awayTeam}</td>
+                            <td style="color: #94a3b8; font-size: 11px;">${lName}</td>
+                        </tr>
+                    `;
+                }
+
+                compactHtml += `</tbody></table>`;
+                mainContainer.innerHTML = compactHtml;
+                return;
+            }
+
             let html = "";
             for (let item of matchesToDisplay) {
                 let ev = item.event;
@@ -1319,7 +1407,7 @@ dashboard_html = """
                     centerBadge = `
                         <div>
                             <span class="badge-pre">🕒 ${kickoff}</span>
-                            <div class="venue-text">📍 ${venueName}</div>
+                            <div style="font-size: 10px; color: #94a3b8; margin-top: 2px;">📍 ${venueName}</div>
                             <h3 style="color:#94a3b8; margin:3px 0;">vs</h3>
                         </div>
                     `;
