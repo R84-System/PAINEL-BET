@@ -937,9 +937,8 @@ dashboard_html = """
                         if (onlyToday) {
                             let evDateYMD = ev.date ? ev.date.split('T')[0] : '';
                             if (evDateYMD !== todayYMD) continue;
-                        }
-
-                        if (searchQuery) {
+                            matchesToDisplay.push({ leagueName, lSlug, event: ev });
+                        } else if (searchQuery) {
                             if (ev.name.toLowerCase().includes(searchQuery)) {
                                 matchesToDisplay.push({ leagueName, lSlug, event: ev });
                             }
@@ -1448,14 +1447,10 @@ dashboard_html = """
         });
         document.getElementById('searchInput').addEventListener('input', fetchAllData);
 
-        // Inicialização e intervalos otimizados
         fetchAllData();
         updateGlobalTicker();
 
-        // Partidas atualizam a cada 10s (evita rate limit)
         pollInterval = setInterval(fetchAllData, 10000);
-        
-        // Ticker global atualiza a cada 45s de forma independente
         tickerInterval = setInterval(updateGlobalTicker, 45000);
     </script>
 </body>
