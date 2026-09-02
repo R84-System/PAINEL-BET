@@ -713,7 +713,6 @@ dashboard_html = """
 
             if (isCup) {
                 try {
-                    // Buscando o scoreboard completo da temporada para garantir o chaveamento completo
                     let res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard?limit=200`);
                     if (res.ok) {
                         let data = await res.json();
@@ -739,7 +738,6 @@ dashboard_html = """
                             let roundName = comp.season?.type?.name || comp.tournament?.name || "Fase Eliminatória";
                             if (comp.type && comp.type.text) roundName = comp.type.text;
                             
-                            // Traduzindo e padronizando nomes comuns de fases
                             if (roundName.toLowerCase().includes('round of 16') || roundName.toLowerCase().includes('oitavas')) roundName = "Oitavas de Final";
                             else if (roundName.toLowerCase().includes('quarter') || roundName.toLowerCase().includes('quartas')) roundName = "Quartas de Final";
                             else if (roundName.toLowerCase().includes('semi')) roundName = "Semifinais";
@@ -749,7 +747,6 @@ dashboard_html = """
                             roundsMap[roundName].push({ ev, comp });
                         }
 
-                        // Ordem lógica das fases
                         let orderedRounds = ["Oitavas de Final", "Quartas de Final", "Semifinais", "Final"];
                         let presentRounds = Object.keys(roundsMap);
                         let sortedKeys = orderedRounds.filter(r => presentRounds.includes(r)).concat(presentRounds.filter(r => !orderedRounds.includes(r)));
