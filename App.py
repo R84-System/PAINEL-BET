@@ -411,7 +411,7 @@ dashboard_html = """
                     <option value="all_live">🟢 Todos os Jogos ao Vivo (Global)</option>
                     <option value="bra.1">🇧🇷 Brasileirão Série A</option>
                     <option value="bra.2">🇧🇷 Brasileirão Série B</option>
-                    <option value="bra.copa_brasil">🇧🇷 Copa do Brasil</option>
+                    <option value="bra.copa_do_brazil">🇧🇷 Copa do Brasil</option>
                     <option value="conmebol.libertadores">🌎 Copa Libertadores</option>
                     <option value="conmebol.sudamericana">🌎 Copa Sudamericana</option>
                     <option value="uefa.champions">🇪🇺 Champions League</option>
@@ -423,13 +423,6 @@ dashboard_html = """
                     <option value="fra.1">🇫🇷 Ligue 1</option>
                     <option value="por.1">🇵🇹 Primeira Liga</option>
                     <option value="ksa.1">🇸🇦 Saudi Pro League</option>
-                    <option value="qat.1">🇶🇦 Qatar Stars League</option>
-                    <option value="uae.1">🇦🇪 UAE Pro League</option>
-                    <option value="afc.champions">🌏 AFC Champions League</option>
-                    <option value="jpn.1">🇯🇵 J1 League (Japão)</option>
-                    <option value="kor.1">🇰🇷 K League 1 (Coreia do Sul)</option>
-                    <option value="chn.1">🇨🇳 Chinese Super League</option>
-                    <option value="aus.1">🇦🇺 A-League (Austrália)</option>
                     <option value="arg.1">🇦🇷 Liga Profesional</option>
                     <option value="mex.1">🇲🇽 Liga MX</option>
                     <option value="col.1">🇨🇴 Campeonato Colombiano</option>
@@ -454,14 +447,11 @@ dashboard_html = """
 
     <script>
         const LEAGUES = {
-            "bra.1": "Brasileirão Série A", "bra.2": "Brasileirão Série B", "bra.copa_brasil": "Copa do Brasil",
+            "bra.1": "Brasileirão Série A", "bra.2": "Brasileirão Série B", "bra.copa_do_brazil": "Copa do Brasil",
             "conmebol.libertadores": "Copa Libertadores", "conmebol.sudamericana": "Copa Sudamericana",
             "uefa.champions": "Champions League", "uefa.europa": "Europa League",
             "eng.1": "Premier League", "esp.1": "La Liga", "ita.1": "Serie A (Itália)", "ger.1": "Bundesliga",
             "fra.1": "Ligue 1", "por.1": "Primeira Liga", "ksa.1": "Saudi Pro League",
-            "qat.1": "Qatar Stars League", "uae.1": "UAE Pro League",
-            "afc.champions": "AFC Champions League", "jpn.1": "J1 League (Japão)", "kor.1": "K League 1 (Coreia do Sul)",
-            "chn.1": "Chinese Super League", "aus.1": "A-League (Austrália)",
             "arg.1": "Liga Profesional", "mex.1": "Liga MX", "col.1": "Campeonato Colombiano",
             "ecu.1": "Campeonato do Equador", "chi.1": "Liga Chilena", "ned.1": "Eredivisie",
             "usa.1": "MLS", "fifa.friendly": "Jogos Internacionais"
@@ -574,13 +564,23 @@ dashboard_html = """
 
         async function updateGlobalTicker() {
             let tickerMatches = [];
+            let yestStr = getBrasiliaDate(-1).compact;
+            let todayStr = getBrasiliaDate(0).compact;
 
             for (let lSlug of Object.keys(LEAGUES)) {
                 try {
-                    let res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard`);
-                    if (!res.ok) continue;
-                    let data = await res.json();
-                    let events = data.events || [];
+                    let [resYest, resToday] = await Promise.all([
+                        fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard?dates=${yestStr}`),
+                        fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard?dates=${todayStr}`)
+                    ]);
+
+                    let dataYest = resYest.ok ? await resYest.json() : { events: [] };
+                    let dataToday = resToday.ok ? await resToday.json() : { events: [] };
+
+                    let eventMap = {};
+                    (dataYest.events || []).forEach(ev => eventMap[ev.id] = ev);
+                    (dataToday.events || []).forEach(ev => eventMap[ev.id] = ev);
+                    let events = Object.values(eventMap);
 
                     for (let ev of events) {
                         let comp = ev.competitions[0];
@@ -719,7 +719,7 @@ dashboard_html = """
 
             mainContainer.innerHTML = "<div style='text-align:center; color:#94a3b8; padding:20px;'>Carregando classificação e chaveamentos...</div>";
 
-            let isCup = lSlug.includes('copa_brasil') || lSlug.includes('libertadores') || lSlug.includes('sudamericana') || lSlug.includes('champions') || lSlug.includes('europa') || lSlug.includes('friendly');
+            let isCup = lSlug.includes('copa_do_brazil') || lSlug.includes('copa_brasil') || lSlug.includes('libertadores') || lSlug.includes('sudamericana') || lSlug.includes('champions') || lSlug.includes('europa') || lSlug.includes('friendly');
 
             if (isCup) {
                 try {
@@ -943,14 +943,29 @@ dashboard_html = """
             
             let matchesToDisplay = [];
             let leaguesToFetch = selectedLeague === 'all_live' ? Object.keys(LEAGUES) : [selectedLeague];
+
+            let yestStr = getBrasiliaDate(-1).compact;
+            let todayStr = getBrasiliaDate(0).compact;
+            let tomorrowStr = getBrasiliaDate(1).compact;
             let todayBrasilia = getBrasiliaDate(0); 
 
             for (let lSlug of leaguesToFetch) {
                 try {
-                    let res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard`);
-                    if (!res.ok) continue;
-                    let data = await res.json();
-                    let events = data.events || [];
+                    let [resYest, resToday, resTomorrow] = await Promise.all([
+                        fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard?dates=${yestStr}`),
+                        fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard?dates=${todayStr}`),
+                        fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard?dates=${tomorrowStr}`)
+                    ]);
+
+                    let dataYest = resYest.ok ? await resYest.json() : { events: [] };
+                    let dataToday = resToday.ok ? await resToday.json() : { events: [] };
+                    let dataTomorrow = resTomorrow.ok ? await resTomorrow.json() : { events: [] };
+
+                    let eventMap = {};
+                    (dataYest.events || []).forEach(ev => eventMap[ev.id] = ev);
+                    (dataToday.events || []).forEach(ev => eventMap[ev.id] = ev);
+                    (dataTomorrow.events || []).forEach(ev => eventMap[ev.id] = ev);
+                    let events = Object.values(eventMap);
 
                     for (let ev of events) {
                         let comp = ev.competitions[0];
@@ -1350,146 +1365,3 @@ dashboard_html = """
                             <h2 style="color:#fff; margin:4px 0;">${homeScore} x ${awayScore}</h2>
                         </div>
                     `;
-                } else {
-                    centerBadge = `
-                        <div>
-                            <span class="badge-pre">🕒 ${kickoff}</span>
-                            <div class="venue-text">📍 ${venueName}</div>
-                            <h3 style="color:#94a3b8; margin:3px 0;">vs</h3>
-                        </div>
-                    `;
-                }
-
-                let isOpen = openStates[eventId] ? 'open' : '';
-                let possH = hStats.possessionPct || "0%"; if(!possH.includes("%") && possH !== "0") possH += "%";
-                let possA = aStats.possessionPct || "0%"; if(!possA.includes("%") && possA !== "0") possA += "%";
-
-                let hCurrentHtml = hCurrentPlayers.length > 0 ? hCurrentPlayers.join("<br>") : "<span style='color:#64748b;'>Escalação não informada</span>";
-                let aCurrentHtml = aCurrentPlayers.length > 0 ? aCurrentPlayers.join("<br>") : "<span style='color:#64748b;'>Escalação não informada</span>";
-
-                let hSubHtml = substitutionsListHome.length > 0 ? `<div style="margin-top:6px; border-top:1px dashed #334155; padding-top:4px;"><div style="font-weight:bold; color:#facc15; font-size:10px; margin-bottom:2px;">🔄 Substituições:</div>${substitutionsListHome.join("<br>")}</div>` : '';
-                let aSubHtml = substitutionsListAway.length > 0 ? `<div style="margin-top:6px; border-top:1px dashed #334155; padding-top:4px;"><div style="font-weight:bold; color:#facc15; font-size:10px; margin-bottom:2px;">🔄 Substituições:</div>${substitutionsListAway.join("<br>")}</div>` : '';
-
-                let activeChartType = chartTypes[eventId] || 'line';
-                let chartSvgContent = renderChartSvg(eventId, homeTeam, awayTeam, hPct, aPct);
-
-                html += `
-                    <div class="card">
-                        <div class="header-league">🏆 Campeonato: ${lName}</div>
-                        <div class="match-grid">
-                            <div>
-                                ${hGoalsHtml}
-                                ${hRedCardsHtml}
-                                <div class="team-home">${homeTeam}</div>
-                                <div style="text-align:right; margin-top:4px;">
-                                    <span class="pressure-label" style="color: ${getBarColor(hPct)};">${getBarLabel(hPct)} (${hPct}%)</span>
-                                    <div class="pressure-track"><div class="pressure-fill" style="background-color: ${getBarColor(hPct)}; width: ${hPct}%;"></div></div>
-                                </div>
-                            </div>
-                            <div class="center-info">
-                                ${centerBadge}
-                            </div>
-                            <div>
-                                ${aGoalsHtml}
-                                ${aRedCardsHtml}
-                                <div class="team-away">${awayTeam}</div>
-                                <div style="text-align:left; margin-top:4px;">
-                                    <span class="pressure-label" style="color: ${getBarColor(aPct)};">${getBarLabel(aPct)} (${aPct}%)</span>
-                                    <div class="pressure-track"><div class="pressure-fill" style="background-color: ${getBarColor(aPct)}; width: ${aPct}%;"></div></div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="chart-container">
-                            <div class="chart-controls">
-                                <span>📈 Força/Pressão Comparativa (${homeTeam} <span style="color:#38bdf8;">■</span> vs ${awayTeam} <span style="color:#facc15;">■</span>)</span>
-                                <div>
-                                    <label>Estilo:</label>
-                                    <select onchange="chartTypes['${eventId}'] = this.value; fetchAllData();">
-                                        <option value="line" ${activeChartType==='line'?'selected':''}>Linha</option>
-                                        <option value="candle" ${activeChartType==='candle'?'selected':''}>Candlestick</option>
-                                    </select>
-                                </div>
-                            </div>
-                            ${chartSvgContent}
-                        </div>
-
-                        <details data-event-id="${eventId}" ${isOpen} ontoggle="openStates['${eventId}'] = this.open;">
-                            <summary>📊 Estatísticas & Jogadores em Campo (${homeTeam} vs ${awayTeam})</summary>
-                            
-                            <div class="match-details-layout">
-                                <div class="roster-panel">
-                                    <div style="font-weight:bold; color:#38bdf8; margin-bottom:6px; font-size:11px; text-transform:uppercase; text-align:center;">Em Campo (${homeTeam})</div>
-                                    <div style="font-size:10px; color:#cbd5e1; line-height: 1.4;">${hCurrentHtml}</div>
-                                    ${hSubHtml}
-                                </div>
-
-                                <div class="stats-panel">
-                                    <div style="font-weight:bold; color:#facc15; margin-bottom:6px; font-size:11px; text-transform:uppercase; text-align:center;">Estatísticas da Partida</div>
-                                    <div class="stats-grid-inner">
-                                        <div class="stat-home"><b>${possH}</b></div>
-                                        <div class="stat-label">Posse de Bola</div>
-                                        <div class="stat-away"><b>${possA}</b></div>
-
-                                        <div class="stat-home">${hStats.shotsOnTarget || '0'}</div>
-                                        <div class="stat-label">Chutes no Gol</div>
-                                        <div class="stat-away">${aStats.shotsOnTarget || '0'}</div>
-
-                                        <div class="stat-home">${hStats.totalShots || '0'}</div>
-                                        <div class="stat-label">Chutes Totais</div>
-                                        <div class="stat-away">${aStats.totalShots || '0'}</div>
-
-                                        <div class="stat-home">${hStats.wonCorners || '0'}</div>
-                                        <div class="stat-label">Escanteios</div>
-                                        <div class="stat-away">${aStats.wonCorners || '0'}</div>
-
-                                        <div class="stat-home">${hStats.foulsCommitted || hStats.fouls || '0'}</div>
-                                        <div class="stat-label">Faltas Cometidas</div>
-                                        <div class="stat-away">${aStats.foulsCommitted || aStats.fouls || '0'}</div>
-
-                                        <div class="stat-home"><b>${hSaves}</b></div>
-                                        <div class="stat-label">Defesas do Goleiro</div>
-                                        <div class="stat-away"><b>${aSaves}</b></div>
-
-                                        <div class="stat-home"><span class="yellow-card">🟨 ${hYellowCount}</span></div>
-                                        <div class="stat-label">Cartões Amarelos</div>
-                                        <div class="stat-away"><span class="yellow-card">🟨 ${aYellowCount}</span></div>
-
-                                        <div class="stat-home"><span class="red-card">🟥 ${hRedCount}</span></div>
-                                        <div class="stat-label">Cartões Vermelhos</div>
-                                        <div class="stat-away"><span class="red-card">🟥 ${aRedCount}</span></div>
-                                    </div>
-                                </div>
-
-                                <div class="roster-panel">
-                                    <div style="font-weight:bold; color:#f43f5e; margin-bottom:6px; font-size:11px; text-transform:uppercase; text-align:center;">Em Campo (${awayTeam})</div>
-                                    <div style="font-size:10px; color:#cbd5e1; line-height: 1.4;">${aCurrentHtml}</div>
-                                    ${aSubHtml}
-                                </div>
-                            </div>
-                        </details>
-                    </div>
-                `;
-            }
-
-            mainContainer.innerHTML = html;
-        }
-
-        document.getElementById('viewSelect').addEventListener('change', fetchAllData);
-        document.getElementById('leagueSelect').addEventListener('change', () => {
-            currentLoadedStandingsKey = "";
-            fetchAllData();
-        });
-        document.getElementById('searchInput').addEventListener('input', fetchAllData);
-
-        fetchAllData();
-        updateGlobalTicker();
-
-        pollInterval = setInterval(fetchAllData, 10000);
-        tickerInterval = setInterval(updateGlobalTicker, 45000);
-    </script>
-</body>
-</html>
-"""
-
-st.components.v1.html(dashboard_html, height=1350, scrolling=True)
