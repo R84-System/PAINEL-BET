@@ -402,7 +402,7 @@ dashboard_html = """
                 <label style="font-size:11px; color:#dbeafe; display:block; margin-bottom:2px; font-weight:bold;">Visualização</label>
                 <select id="viewSelect">
                     <option value="matches">⚽ Partidas & Jogos</option>
-                    <option value="standings">📊 Classificação</option>
+                    <option value="standings">📊 Classificação / Chaveamento</option>
                 </select>
             </div>
             <div>
@@ -713,17 +713,18 @@ dashboard_html = """
 
             if (isCup) {
                 try {
-                    let res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard`);
+                    // Buscando o scoreboard completo da temporada para garantir o chaveamento completo
+                    let res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard?limit=200`);
                     if (res.ok) {
                         let data = await res.json();
                         let events = data.events || [];
                         let leagueTitle = LEAGUES[lSlug] || lSlug;
                         
-                        let html = `<h3 style="color:#38bdf8; margin-bottom:8px; font-size:15px;">🏆 Chaveamento & Confrontos (Mata-Mata) - ${leagueTitle}</h3>`;
+                        let html = `<h3 style="color:#38bdf8; margin-bottom:8px; font-size:15px;">🏆 Chaveamento Completo & Confrontos (Mata-Mata) - ${leagueTitle}</h3>`;
                         
                         if (events.length === 0) {
                             html = `
-                                <h3 style="color:#38bdf8; margin-bottom:8px; font-size:15px;">🏆 Chaveamento & Confrontos (Mata-Mata) - ${leagueTitle}</h3>
+                                <h3 style="color:#38bdf8; margin-bottom:8px; font-size:15px;">🏆 Chaveamento Completo & Confrontos (Mata-Mata) - ${leagueTitle}</h3>
                                 <div style='text-align:center; color:#94a3b8; padding:20px;'>Nenhum confronto de mata-mata encontrado no momento para este campeonato.</div>
                             `;
                             standingsCache[lSlug] = html;
@@ -737,12 +738,25 @@ dashboard_html = """
                             let comp = ev.competitions[0];
                             let roundName = comp.season?.type?.name || comp.tournament?.name || "Fase Eliminatória";
                             if (comp.type && comp.type.text) roundName = comp.type.text;
+                            
+                            // Traduzindo e padronizando nomes comuns de fases
+                            if (roundName.toLowerCase().includes('round of 16') || roundName.toLowerCase().includes('oitavas')) roundName = "Oitavas de Final";
+                            else if (roundName.toLowerCase().includes('quarter') || roundName.toLowerCase().includes('quartas')) roundName = "Quartas de Final";
+                            else if (roundName.toLowerCase().includes('semi')) roundName = "Semifinais";
+                            else if (roundName.toLowerCase().includes('final')) roundName = "Final";
+
                             if (!roundsMap[roundName]) roundsMap[roundName] = [];
                             roundsMap[roundName].push({ ev, comp });
                         }
 
+                        // Ordem lógica das fases
+                        let orderedRounds = ["Oitavas de Final", "Quartas de Final", "Semifinais", "Final"];
+                        let presentRounds = Object.keys(roundsMap);
+                        let sortedKeys = orderedRounds.filter(r => presentRounds.includes(r)).concat(presentRounds.filter(r => !orderedRounds.includes(r)));
+
                         html += `<div class="bracket-container">`;
-                        for (let [rName, matchesList] of Object.entries(roundsMap)) {
+                        for (let rName of sortedKeys) {
+                            let matchesList = roundsMap[rName];
                             html += `
                                 <div>
                                     <div class="bracket-round-title">📌 ${rName}</div>
@@ -752,17 +766,34 @@ dashboard_html = """
                                 let ev = item.ev;
                                 let comp = item.comp;
                                 let hTeam = "Casa", aTeam = "Fora", hScore = "0", aScore = "0";
+                                let hId = "", aId = "";
                                 for (let c of comp.competitors) {
                                     if (c.homeAway === 'home') {
                                         hTeam = c.team.displayName || c.team.shortDisplayName;
+                                        hId = c.team.id;
                                         hScore = c.score;
                                     } else {
                                         aTeam = c.team.displayName || c.team.shortDisplayName;
+                                        aId = c.team.id;
                                         aScore = c.score;
                                     }
                                 }
                                 let dateStr = formatDateBrasilia(ev.date);
+                                let state = comp.status.type.state;
                                 let statusDetail = comp.status.type.detail || comp.status.type.description || comp.status.type.name;
+
+                                let statusBadge = `<span style="color:#38bdf8;">${statusDetail}</span>`;
+                                if (state === 'post') {
+                                    let hNum = parseInt(hScore) || 0;
+                                    let aNum = parseInt(aScore) || 0;
+                                    if (hNum > aNum) {
+                                        statusBadge = `<span style="color: #2ecc71; font-weight: bold;">✔️ ${hTeam} Classificado</span>`;
+                                    } else if (aNum > hNum) {
+                                        statusBadge = `<span style="color: #2ecc71; font-weight: bold;">✔️ ${aTeam} Classificado</span>`;
+                                    } else {
+                                        statusBadge = `<span style="color: #facc15; font-weight: bold;">⚖️ Empate / Pênaltis</span>`;
+                                    }
+                                }
 
                                 html += `
                                     <div class="bracket-match-card">
@@ -772,7 +803,7 @@ dashboard_html = """
                                             <span style="background:#0f172a; padding:2px 6px; border-radius:4px; margin:0 6px; border:1px solid #334155; font-size:12px;">${hScore} x ${aScore}</span>
                                             <span style="flex:1; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${aTeam}">${aTeam}</span>
                                         </div>
-                                        <div style="text-align:center; font-size:9px; color:#38bdf8; margin-top:3px;">${statusDetail}</div>
+                                        <div style="text-align:center; font-size:10px; margin-top:4px;">${statusBadge}</div>
                                     </div>
                                 `;
                             }
