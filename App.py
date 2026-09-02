@@ -423,6 +423,11 @@ dashboard_html = """
                     <option value="fra.1">🇫🇷 Ligue 1</option>
                     <option value="por.1">🇵🇹 Primeira Liga</option>
                     <option value="ksa.1">🇸🇦 Saudi Pro League</option>
+                    <option value="afc.champions">🌏 AFC Champions League</option>
+                    <option value="jpn.1">🇯🇵 J1 League (Japão)</option>
+                    <option value="kor.1">🇰🇷 K League 1 (Coreia do Sul)</option>
+                    <option value="chn.1">🇨🇳 Chinese Super League</option>
+                    <option value="aus.1">🇦🇺 A-League (Austrália)</option>
                     <option value="arg.1">🇦🇷 Liga Profesional</option>
                     <option value="mex.1">🇲🇽 Liga MX</option>
                     <option value="col.1">🇨🇴 Campeonato Colombiano</option>
@@ -452,6 +457,8 @@ dashboard_html = """
             "uefa.champions": "Champions League", "uefa.europa": "Europa League",
             "eng.1": "Premier League", "esp.1": "La Liga", "ita.1": "Serie A (Itália)", "ger.1": "Bundesliga",
             "fra.1": "Ligue 1", "por.1": "Primeira Liga", "ksa.1": "Saudi Pro League",
+            "afc.champions": "AFC Champions League", "jpn.1": "J1 League (Japão)", "kor.1": "K League 1 (Coreia do Sul)",
+            "chn.1": "Chinese Super League", "aus.1": "A-League (Austrália)",
             "arg.1": "Liga Profesional", "mex.1": "Liga MX", "col.1": "Campeonato Colombiano",
             "ecu.1": "Campeonato do Equador", "chi.1": "Liga Chilena", "ned.1": "Eredivisie",
             "usa.1": "MLS", "fifa.friendly": "Jogos Internacionais"
