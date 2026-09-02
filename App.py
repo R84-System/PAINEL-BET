@@ -459,8 +459,8 @@ dashboard_html = """
         let summariesCache = {};
         let standingsCache = {};
         let openStates = {};
-        let matchHistory = {};
-        let chartTypes = {};
+        let matchHistory = {}; // Armazena histórico minuto a minuto por partida
+        let chartTypes = {};   // Armazena o tipo de gráfico escolhido por partida ('line' ou 'candle')
         let goalAlertTimer = null;
         let pollInterval = null;
         let currentLoadedStandingsKey = "";
@@ -622,6 +622,7 @@ dashboard_html = """
 
             let svg = `<svg viewBox="0 0 ${width} ${height}" style="width:100%; height:${height}px; overflow:visible;">`;
             
+            // Linhas de grade de fundo
             svg += `<line x1="0" y1="20" x2="${width}" y2="20" stroke="#1e293b" stroke-width="1" />`;
             svg += `<line x1="0" y1="40" x2="${width}" y2="40" stroke="#1e293b" stroke-width="1" stroke-dasharray="2,2"/>`;
             svg += `<line x1="0" y1="60" x2="${width}" y2="60" stroke="#1e293b" stroke-width="1" />`;
@@ -649,6 +650,7 @@ dashboard_html = """
                     svg += `<circle cx="${x}" cy="${y}" r="2.5" fill="#facc15" />`;
                 });
             } else {
+                // Modo Candlestick (Velas do Mercado Financeiro)
                 let candleWidth = Math.max(3, Math.min(12, (width / minutes.length) - 4));
                 minutes.forEach((m, idx) => {
                     let c = history[m];
@@ -664,7 +666,9 @@ dashboard_html = """
                     let rectY = Math.min(yOpen, yClose);
                     let rectH = Math.max(2, Math.abs(yClose - yOpen));
 
+                    // Pavio (Wick)
                     svg += `<line x1="${x}" y1="${yHigh}" x2="${x}" y2="${yLow}" stroke="${color}" stroke-width="1.5" />`;
+                    // Corpo do Candle
                     svg += `<rect x="${x - candleWidth/2}" y="${rectY}" width="${candleWidth}" height="${rectH}" fill="${color}" rx="1" />`;
                 });
             }
@@ -1257,6 +1261,7 @@ dashboard_html = """
                 let hPct = totalPress === 0 ? 50 : Math.round((hScorePress / totalPress) * 100);
                 let aPct = 100 - hPct;
 
+                // Registrar Histórico de Minuto a Minuto para o Gráfico
                 if (state === 'in') {
                     let currentMin = parseInt(displayClock) || (period === 1 ? 25 : 70);
                     if (!matchHistory[eventId]) matchHistory[eventId] = {};
@@ -1355,6 +1360,7 @@ dashboard_html = """
                             </div>
                         </div>
 
+                        <!-- Gráfico Minuto a Minuto (Linha ou Candlestick) -->
                         <div class="chart-container">
                             <div class="chart-controls">
                                 <span>📈 Força/Pressão Minuto a Minuto (${homeTeam})</span>
