@@ -652,23 +652,26 @@ dashboard_html = """
             let cType = chartTypes[eventId] || 'line';
 
             let width = 500;
-            let height = 95;
+            let height = 105;
 
             let svg = `<svg viewBox="0 0 ${width} ${height}" style="width:100%; height:${height}px; overflow:visible;">`;
             
-            svg += `<line x1="0" y1="20" x2="${width}" y2="20" stroke="#1e293b" stroke-width="1" />`;
-            svg += `<line x1="0" y1="45" x2="${width}" y2="45" stroke="#1e293b" stroke-width="1" stroke-dasharray="2,2"/>`;
-            svg += `<line x1="0" y1="70" x2="${width}" y2="70" stroke="#1e293b" stroke-width="1" />`;
+            // Linhas de referência de fundo
+            svg += `<line x1="20" y1="15" x2="${width - 20}" y2="15" stroke="#1e293b" stroke-width="1" />`;
+            svg += `<line x1="20" y1="42" x2="${width - 20}" y2="42" stroke="#1e293b" stroke-width="1" stroke-dasharray="2,2"/>`;
+            svg += `<line x1="20" y1="70" x2="${width - 20}" y2="70" stroke="#1e293b" stroke-width="1" />`;
 
             let homePoints = [];
             let awayPoints = [];
+            let chartWidth = width - 40;
+            let chartHeight = 55;
 
             minutes.forEach((m, idx) => {
                 let hVal = history[m].home;
                 let aVal = history[m].away;
-                let x = (idx / (minutes.length > 1 ? minutes.length - 1 : 1)) * (width - 40) + 20;
-                let yH = height - (hVal / 100) * (height - 25) - 10;
-                let yA = height - (aVal / 100) * (height - 25) - 10;
+                let x = (idx / (minutes.length > 1 ? minutes.length - 1 : 1)) * chartWidth + 20;
+                let yH = 70 - (hVal / 100) * chartHeight;
+                let yA = 70 - (aVal / 100) * chartHeight;
                 homePoints.push(`${x},${yH}`);
                 awayPoints.push(`${x},${yA}`);
             });
@@ -681,24 +684,42 @@ dashboard_html = """
                 minutes.forEach((m, idx) => {
                     let hVal = history[m].home;
                     let aVal = history[m].away;
-                    let x = (idx / (minutes.length > 1 ? minutes.length - 1 : 1)) * (width - 40) + 20;
-                    let yH = height - (hVal / 100) * (height - 25) - 10;
-                    let yA = height - (aVal / 100) * (height - 25) - 10;
-                    svg += `<circle cx="${x}" cy="${yH}" r="2.5" fill="#38bdf8" />`;
-                    svg += `<circle cx="${x}" cy="${yA}" r="2.5" fill="#facc15" />`;
+                    let x = (idx / (minutes.length > 1 ? minutes.length - 1 : 1)) * chartWidth + 20;
+                    let yH = 70 - (hVal / 100) * chartHeight;
+                    let yA = 70 - (aVal / 100) * chartHeight;
+                    svg += `<circle cx="${x}" cy="${yH}" r="3" fill="#38bdf8" />`;
+                    svg += `<circle cx="${x}" cy="${yA}" r="3" fill="#facc15" />`;
                 });
             } else {
-                let candleWidth = Math.max(3, Math.min(10, (width / minutes.length) - 4));
+                // Modo Colunas / Barras lado a lado
+                let groupWidth = chartWidth / Math.max(1, minutes.length);
+                let barWidth = Math.max(3, groupWidth * 0.38);
+
                 minutes.forEach((m, idx) => {
                     let c = history[m];
-                    let x = (idx / (minutes.length > 1 ? minutes.length - 1 : 1)) * (width - 40) + 20;
-                    
-                    let yH = height - (c.home / 100) * (height - 25) - 10;
-                    let yA = height - (c.away / 100) * (height - 25) - 10;
+                    let xCenter = (idx / (minutes.length > 1 ? minutes.length - 1 : 1)) * chartWidth + 20;
+                    if (minutes.length === 1) xCenter = width / 2;
 
-                    svg += `<rect x="${x - candleWidth/2}" y="${Math.min(yH, yA)}" width="${candleWidth}" height="${Math.max(2, Math.abs(yH - yA))}" fill="#38bdf8" opacity="0.8" rx="1" />`;
+                    let xH = xCenter - barWidth - 1;
+                    let xA = xCenter + 1;
+
+                    let hH = (c.home / 100) * chartHeight;
+                    let aH = (c.away / 100) * chartHeight;
+
+                    let yH = 70 - hH;
+                    let yA = 70 - aH;
+
+                    svg += `<rect x="${xH}" y="${yH}" width="${barWidth}" height="${Math.max(2, hH)}" fill="#38bdf8" opacity="0.85" rx="1" />`;
+                    svg += `<rect x="${xA}" y="${yA}" width="${barWidth}" height="${Math.max(2, aH)}" fill="#facc15" opacity="0.85" rx="1" />`;
                 });
             }
+
+            // Eixo X com os minutos
+            minutes.forEach((m, idx) => {
+                let x = (idx / (minutes.length > 1 ? minutes.length - 1 : 1)) * chartWidth + 20;
+                if (minutes.length === 1) x = width / 2;
+                svg += `<text x="${x}" y="86" fill="#94a3b8" font-size="9" text-anchor="middle">${m}'</text>`;
+            });
 
             svg += `</svg>`;
             return svg;
@@ -1407,7 +1428,7 @@ dashboard_html = """
                                     <label>Estilo:</label>
                                     <select onchange="chartTypes['${eventId}'] = this.value; fetchAllData();">
                                         <option value="line" ${activeChartType==='line'?'selected':''}>Linha</option>
-                                        <option value="candle" ${activeChartType==='candle'?'selected':''}>Candlestick</option>
+                                        <option value="candle" ${activeChartType==='candle'?'selected':''}>Colunas</option>
                                     </select>
                                 </div>
                             </div>
