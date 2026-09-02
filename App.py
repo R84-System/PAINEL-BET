@@ -411,7 +411,7 @@ dashboard_html = """
                     <option value="all_live">🟢 Todos os Jogos ao Vivo (Global)</option>
                     <option value="bra.1">🇧🇷 Brasileirão Série A</option>
                     <option value="bra.2">🇧🇷 Brasileirão Série B</option>
-                    <option value="bra.copa_brasil">🇧🇷 Copa do Brasil</option>
+                    <option value="bra.copa_do_brazil">🇧🇷 Copa do Brasil</option>
                     <option value="conmebol.libertadores">🌎 Copa Libertadores</option>
                     <option value="conmebol.sudamericana">🌎 Copa Sudamericana</option>
                     <option value="uefa.champions">🇪🇺 Champions League</option>
@@ -454,7 +454,7 @@ dashboard_html = """
 
     <script>
         const LEAGUES = {
-            "bra.1": "Brasileirão Série A", "bra.2": "Brasileirão Série B", "bra.copa_brasil": "Copa do Brasil",
+            "bra.1": "Brasileirão Série A", "bra.2": "Brasileirão Série B", "bra.copa_do_brazil": "Copa do Brasil",
             "conmebol.libertadores": "Copa Libertadores", "conmebol.sudamericana": "Copa Sudamericana",
             "uefa.champions": "Champions League", "uefa.europa": "Europa League",
             "eng.1": "Premier League", "esp.1": "La Liga", "ita.1": "Serie A (Itália)", "ger.1": "Bundesliga",
@@ -574,13 +574,23 @@ dashboard_html = """
 
         async function updateGlobalTicker() {
             let tickerMatches = [];
+            let yestStr = getBrasiliaDate(-1).compact;
+            let todayStr = getBrasiliaDate(0).compact;
 
             for (let lSlug of Object.keys(LEAGUES)) {
                 try {
-                    let res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard`);
-                    if (!res.ok) continue;
-                    let data = await res.json();
-                    let events = data.events || [];
+                    let [resYest, resToday] = await Promise.all([
+                        fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard?dates=${yestStr}`),
+                        fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard?dates=${todayStr}`)
+                    ]);
+
+                    let dataYest = resYest.ok ? await resYest.json() : { events: [] };
+                    let dataToday = resToday.ok ? await resToday.json() : { events: [] };
+
+                    let eventMap = {};
+                    (dataYest.events || []).forEach(ev => eventMap[ev.id] = ev);
+                    (dataToday.events || []).forEach(ev => eventMap[ev.id] = ev);
+                    let events = Object.values(eventMap);
 
                     for (let ev of events) {
                         let comp = ev.competitions[0];
@@ -719,7 +729,7 @@ dashboard_html = """
 
             mainContainer.innerHTML = "<div style='text-align:center; color:#94a3b8; padding:20px;'>Carregando classificação e chaveamentos...</div>";
 
-            let isCup = lSlug.includes('copa_brasil') || lSlug.includes('libertadores') || lSlug.includes('sudamericana') || lSlug.includes('champions') || lSlug.includes('europa') || lSlug.includes('friendly');
+            let isCup = lSlug.includes('copa_do_brazil') || lSlug.includes('copa_brasil') || lSlug.includes('libertadores') || lSlug.includes('sudamericana') || lSlug.includes('champions') || lSlug.includes('europa') || lSlug.includes('friendly');
 
             if (isCup) {
                 try {
@@ -943,14 +953,29 @@ dashboard_html = """
             
             let matchesToDisplay = [];
             let leaguesToFetch = selectedLeague === 'all_live' ? Object.keys(LEAGUES) : [selectedLeague];
+
+            let yestStr = getBrasiliaDate(-1).compact;
+            let todayStr = getBrasiliaDate(0).compact;
+            let tomorrowStr = getBrasiliaDate(1).compact;
             let todayBrasilia = getBrasiliaDate(0); 
 
             for (let lSlug of leaguesToFetch) {
                 try {
-                    let res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard`);
-                    if (!res.ok) continue;
-                    let data = await res.json();
-                    let events = data.events || [];
+                    let [resYest, resToday, resTomorrow] = await Promise.all([
+                        fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard?dates=${yestStr}`),
+                        fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard?dates=${todayStr}`),
+                        fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard?dates=${tomorrowStr}`)
+                    ]);
+
+                    let dataYest = resYest.ok ? await resYest.json() : { events: [] };
+                    let dataToday = resToday.ok ? await resToday.json() : { events: [] };
+                    let dataTomorrow = resTomorrow.ok ? await resTomorrow.json() : { events: [] };
+
+                    let eventMap = {};
+                    (dataYest.events || []).forEach(ev => eventMap[ev.id] = ev);
+                    (dataToday.events || []).forEach(ev => eventMap[ev.id] = ev);
+                    (dataTomorrow.events || []).forEach(ev => eventMap[ev.id] = ev);
+                    let events = Object.values(eventMap);
 
                     for (let ev of events) {
                         let comp = ev.competitions[0];
