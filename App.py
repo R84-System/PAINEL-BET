@@ -529,13 +529,23 @@ dashboard_html = """
             } catch(e) { return "Horário a confirmar"; }
         }
 
-        function getDateString(offsetDays) {
+        function getBrasiliaDate(offsetDays = 0) {
             let d = new Date();
             d.setDate(d.getDate() + offsetDays);
-            let year = d.getFullYear();
-            let month = String(d.getMonth() + 1).padStart(2, '0');
-            let day = String(d.getDate()).padStart(2, '0');
-            return `${year}${month}${day}`;
+            let formatter = new Intl.DateTimeFormat('en-CA', {
+                timeZone: 'America/Sao_Paulo',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+            });
+            let parts = formatter.formatToParts(d);
+            let year = parts.find(p => p.type === 'year').value;
+            let month = parts.find(p => p.type === 'month').value;
+            let day = parts.find(p => p.type === 'day').value;
+            return {
+                ymd: `${year}-${month}-${day}`,
+                compact: `${year}${month}${day}`
+            };
         }
 
         async function asyncizedFetchSummary(slug, eventId, isLive = false) {
@@ -554,8 +564,8 @@ dashboard_html = """
 
         async function updateGlobalTicker() {
             let tickerMatches = [];
-            let yestStr = getDateString(-1);
-            let todayStr = getDateString(0);
+            let yestStr = getBrasiliaDate(-1).compact;
+            let todayStr = getBrasiliaDate(0).compact;
 
             for (let lSlug of Object.keys(LEAGUES)) {
                 try {
@@ -934,10 +944,10 @@ dashboard_html = """
             let matchesToDisplay = [];
             let leaguesToFetch = selectedLeague === 'all_live' ? Object.keys(LEAGUES) : [selectedLeague];
 
-            let yestStr = getDateString(-1);
-            let todayStr = getDateString(0);
-            let tomorrowStr = getDateString(1);
-            let todayYMD = new Date().toLocaleDateString('en-CA'); 
+            let yestStr = getBrasiliaDate(-1).compact;
+            let todayStr = getBrasiliaDate(0).compact;
+            let tomorrowStr = getBrasiliaDate(1).compact;
+            let todayBrasilia = getBrasiliaDate(0); 
 
             for (let lSlug of leaguesToFetch) {
                 try {
@@ -963,8 +973,20 @@ dashboard_html = """
                         let leagueName = LEAGUES[lSlug] || lSlug;
 
                         if (onlyToday) {
-                            let evDateYMD = ev.date ? ev.date.split('T')[0] : '';
-                            if (evDateYMD !== todayYMD) continue;
+                            let evDate = new Date(ev.date);
+                            let evBrasiliaFormatter = new Intl.DateTimeFormat('en-CA', {
+                                timeZone: 'America/Sao_Paulo',
+                                year: 'numeric',
+                                month: '2-digit',
+                                day: '2-digit'
+                            });
+                            let evParts = evBrasiliaFormatter.formatToParts(evDate);
+                            let evY = evParts.find(p => p.type === 'year').value;
+                            let evM = evParts.find(p => p.type === 'month').value;
+                            let evD = evParts.find(p => p.type === 'day').value;
+                            let evDateYMD = `${evY}-${evM}-${evD}`;
+
+                            if (evDateYMD !== todayBrasilia.ymd) continue;
                             matchesToDisplay.push({ leagueName, lSlug, event: ev });
                         } else if (searchQuery) {
                             if (ev.name.toLowerCase().includes(searchQuery)) {
