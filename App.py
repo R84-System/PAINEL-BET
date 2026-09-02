@@ -411,7 +411,7 @@ dashboard_html = """
                     <option value="all_live">🟢 Todos os Jogos ao Vivo (Global)</option>
                     <option value="bra.1">🇧🇷 Brasileirão Série A</option>
                     <option value="bra.2">🇧🇷 Brasileirão Série B</option>
-                    <option value="bra.copa_brasil">🇧🇷 Copa do Brasil</option>
+                    <option value="bra.copa_do_brazil">🇧🇷 Copa do Brasil</option>
                     <option value="conmebol.libertadores">🌎 Copa Libertadores</option>
                     <option value="conmebol.sudamericana">🌎 Copa Sudamericana</option>
                     <option value="uefa.champions">🇪🇺 Champions League</option>
@@ -447,7 +447,7 @@ dashboard_html = """
 
     <script>
         const LEAGUES = {
-            "bra.1": "Brasileirão Série A", "bra.2": "Brasileirão Série B", "bra.copa_brasil": "Copa do Brasil",
+            "bra.1": "Brasileirão Série A", "bra.2": "Brasileirão Série B", "bra.copa_do_brazil": "Copa do Brasil",
             "conmebol.libertadores": "Copa Libertadores", "conmebol.sudamericana": "Copa Sudamericana",
             "uefa.champions": "Champions League", "uefa.europa": "Europa League",
             "eng.1": "Premier League", "esp.1": "La Liga", "ita.1": "Serie A (Itália)", "ger.1": "Bundesliga",
@@ -709,7 +709,7 @@ dashboard_html = """
 
             mainContainer.innerHTML = "<div style='text-align:center; color:#94a3b8; padding:20px;'>Carregando classificação e chaveamentos...</div>";
 
-            let isCup = lSlug.includes('copa_brasil') || lSlug.includes('libertadores') || lSlug.includes('sudamericana') || lSlug.includes('champions') || lSlug.includes('europa') || lSlug.includes('friendly');
+            let isCup = lSlug.includes('copa_do_brazil') || lSlug.includes('copa_brasil') || lSlug.includes('libertadores') || lSlug.includes('sudamericana') || lSlug.includes('champions') || lSlug.includes('europa') || lSlug.includes('friendly');
 
             if (isCup) {
                 try {
