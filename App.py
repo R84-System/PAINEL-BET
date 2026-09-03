@@ -1517,7 +1517,7 @@ dashboard_html = """
         fetchAllData();
         updateGlobalTicker();
 
-        pollInterval = setInterval(fetchAllData, 10000);
+        pollInterval = setInterval(fetchAllData, 4000);
         tickerInterval = setInterval(updateGlobalTicker, 45000);
     </script>
 </body>
