@@ -473,6 +473,7 @@ dashboard_html = """
         let summariesCache = {};
         let standingsCache = {};
         let openStates = {};
+        let openChartStates = {};
         let matchHistory = {}; 
         let chartTypes = {};   
         let onlyToday = false; 
@@ -640,10 +641,7 @@ dashboard_html = """
         function renderChartSvg(eventId, hTeamName, aTeamName, currentHPct, currentAPct) {
             if (!matchHistory[eventId] || Object.keys(matchHistory[eventId]).length === 0) {
                 matchHistory[eventId] = {
-                    15: { home: Math.max(10, Math.round(currentHPct * 0.85)), away: Math.max(10, Math.round(currentAPct * 1.15)) },
-                    45: { home: currentHPct, away: currentAPct },
-                    75: { home: Math.max(10, Math.round(currentHPct * 1.05)), away: Math.max(10, Math.round(currentAPct * 0.95)) },
-                    90: { home: currentHPct, away: currentAPct }
+                    10: { home: currentHPct, away: currentAPct }
                 };
             }
 
@@ -656,7 +654,6 @@ dashboard_html = """
 
             let svg = `<svg viewBox="0 0 ${width} ${height}" style="width:100%; height:${height}px; overflow:visible;">`;
             
-            // Linhas de referência de fundo
             svg += `<line x1="20" y1="15" x2="${width - 20}" y2="15" stroke="#1e293b" stroke-width="1" />`;
             svg += `<line x1="20" y1="42" x2="${width - 20}" y2="42" stroke="#1e293b" stroke-width="1" stroke-dasharray="2,2"/>`;
             svg += `<line x1="20" y1="70" x2="${width - 20}" y2="70" stroke="#1e293b" stroke-width="1" />`;
@@ -691,7 +688,6 @@ dashboard_html = """
                     svg += `<circle cx="${x}" cy="${yA}" r="3" fill="#facc15" />`;
                 });
             } else {
-                // Modo Colunas / Barras lado a lado
                 let groupWidth = chartWidth / Math.max(1, minutes.length);
                 let barWidth = Math.max(3, groupWidth * 0.38);
 
@@ -714,7 +710,6 @@ dashboard_html = """
                 });
             }
 
-            // Eixo X com os minutos
             minutes.forEach((m, idx) => {
                 let x = (idx / (minutes.length > 1 ? minutes.length - 1 : 1)) * chartWidth + 20;
                 if (minutes.length === 1) x = width / 2;
@@ -1332,9 +1327,13 @@ dashboard_html = """
                 let hPct = totalPress === 0 ? 50 : Math.round((hScorePress / totalPress) * 100);
                 let aPct = 100 - hPct;
 
-                let currentMin = parseInt(displayClock) || (period === 1 ? 25 : (period === 2 ? 70 : 90));
+                let parsedClock = parseInt(displayClock);
                 if (!matchHistory[eventId]) matchHistory[eventId] = {};
-                matchHistory[eventId][currentMin] = { home: hPct, away: aPct };
+                if (!isNaN(parsedClock)) {
+                    matchHistory[eventId][parsedClock] = { home: hPct, away: aPct };
+                } else if (Object.keys(matchHistory[eventId]).length === 0) {
+                    matchHistory[eventId][10] = { home: hPct, away: aPct };
+                }
 
                 let getBarColor = (pct) => pct > 65 ? "#22c55e" : (pct > 51 ? "#f97316" : (pct >= 35 ? "#ffffff" : "#ef4444"));
                 let getBarLabel = (pct) => pct > 65 ? "Pressão Alta" : (pct > 51 ? "Pressão Moderada" : (pct >= 35 ? "Neutro" : "Defensiva / Baixa"));
@@ -1382,6 +1381,7 @@ dashboard_html = """
                 }
 
                 let isOpen = openStates[eventId] ? 'open' : '';
+                let isOpenChart = openChartStates[eventId] ? 'open' : '';
                 let possH = hStats.possessionPct || "0%"; if(!possH.includes("%") && possH !== "0") possH += "%";
                 let possA = aStats.possessionPct || "0%"; if(!possA.includes("%") && possA !== "0") possA += "%";
 
@@ -1421,19 +1421,22 @@ dashboard_html = """
                             </div>
                         </div>
 
-                        <div class="chart-container">
-                            <div class="chart-controls">
-                                <span>📈 Força/Pressão Comparativa (${homeTeam} <span style="color:#38bdf8;">■</span> vs ${awayTeam} <span style="color:#facc15;">■</span>)</span>
-                                <div>
-                                    <label>Estilo:</label>
-                                    <select onchange="chartTypes['${eventId}'] = this.value; fetchAllData();">
-                                        <option value="line" ${activeChartType==='line'?'selected':''}>Linha</option>
-                                        <option value="candle" ${activeChartType==='candle'?'selected':''}>Colunas</option>
-                                    </select>
+                        <details ${isOpenChart} ontoggle="openChartStates['${eventId}'] = this.open;">
+                            <summary>📈 Gráfico de Força e Pressão Comparativa (${homeTeam} vs ${awayTeam})</summary>
+                            <div class="chart-container">
+                                <div class="chart-controls">
+                                    <span>Evolução da Pressão (${homeTeam} <span style="color:#38bdf8;">■</span> vs ${awayTeam} <span style="color:#facc15;">■</span>)</span>
+                                    <div>
+                                        <label>Estilo:</label>
+                                        <select onchange="chartTypes['${eventId}'] = this.value; fetchAllData();">
+                                            <option value="line" ${activeChartType==='line'?'selected':''}>Linha</option>
+                                            <option value="candle" ${activeChartType==='candle'?'selected':''}>Colunas</option>
+                                        </select>
+                                    </div>
                                 </div>
+                                ${chartSvgContent}
                             </div>
-                            ${chartSvgContent}
-                        </div>
+                        </details>
 
                         <details data-event-id="${eventId}" ${isOpen} ontoggle="openStates['${eventId}'] = this.open;">
                             <summary>📊 Estatísticas & Jogadores em Campo (${homeTeam} vs ${awayTeam})</summary>
