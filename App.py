@@ -650,25 +650,25 @@ dashboard_html = """
             let cType = chartTypes[eventId] || 'line';
 
             let width = 500;
-            let height = 105;
+            let height = 115;
 
             let svg = `<svg viewBox="0 0 ${width} ${height}" style="width:100%; height:${height}px; overflow:visible;">`;
             
             svg += `<line x1="20" y1="15" x2="${width - 20}" y2="15" stroke="#1e293b" stroke-width="1" />`;
-            svg += `<line x1="20" y1="42" x2="${width - 20}" y2="42" stroke="#1e293b" stroke-width="1" stroke-dasharray="2,2"/>`;
-            svg += `<line x1="20" y1="70" x2="${width - 20}" y2="70" stroke="#1e293b" stroke-width="1" />`;
+            svg += `<line x1="20" y1="45" x2="${width - 20}" y2="45" stroke="#1e293b" stroke-width="1" stroke-dasharray="2,2"/>`;
+            svg += `<line x1="20" y1="75" x2="${width - 20}" y2="75" stroke="#1e293b" stroke-width="1" />`;
 
             let homePoints = [];
             let awayPoints = [];
             let chartWidth = width - 40;
-            let chartHeight = 55;
+            let chartHeight = 60;
 
             minutes.forEach((m, idx) => {
                 let hVal = history[m].home;
                 let aVal = history[m].away;
                 let x = (idx / (minutes.length > 1 ? minutes.length - 1 : 1)) * chartWidth + 20;
-                let yH = 70 - (hVal / 100) * chartHeight;
-                let yA = 70 - (aVal / 100) * chartHeight;
+                let yH = 75 - (hVal / 100) * chartHeight;
+                let yA = 75 - (aVal / 100) * chartHeight;
                 homePoints.push(`${x},${yH}`);
                 awayPoints.push(`${x},${yA}`);
             });
@@ -679,13 +679,16 @@ dashboard_html = """
                     svg += `<polyline fill="none" stroke="#facc15" stroke-width="2.5" points="${awayPoints.join(' ')}" />`;
                 }
                 minutes.forEach((m, idx) => {
-                    let hVal = history[m].home;
-                    let aVal = history[m].away;
+                    let c = history[m];
                     let x = (idx / (minutes.length > 1 ? minutes.length - 1 : 1)) * chartWidth + 20;
-                    let yH = 70 - (hVal / 100) * chartHeight;
-                    let yA = 70 - (aVal / 100) * chartHeight;
+                    if (minutes.length === 1) x = width / 2;
+                    let yH = 75 - (c.home / 100) * chartHeight;
+                    let yA = 75 - (c.away / 100) * chartHeight;
+                    
                     svg += `<circle cx="${x}" cy="${yH}" r="3" fill="#38bdf8" />`;
                     svg += `<circle cx="${x}" cy="${yA}" r="3" fill="#facc15" />`;
+                    // Variação em texto dentro do gráfico de linha
+                    svg += `<text x="${x}" y="${Math.min(yH, yA) - 6}" fill="#fff" font-size="7" font-weight="bold" text-anchor="middle">${Math.round(c.home)}% x ${Math.round(c.away)}%</text>`;
                 });
             } else {
                 let groupWidth = chartWidth / Math.max(1, minutes.length);
@@ -702,18 +705,21 @@ dashboard_html = """
                     let hH = (c.home / 100) * chartHeight;
                     let aH = (c.away / 100) * chartHeight;
 
-                    let yH = 70 - hH;
-                    let yA = 70 - aH;
+                    let yH = 75 - hH;
+                    let yA = 75 - aH;
 
                     svg += `<rect x="${xH}" y="${yH}" width="${barWidth}" height="${Math.max(2, hH)}" fill="#38bdf8" opacity="0.85" rx="1" />`;
                     svg += `<rect x="${xA}" y="${yA}" width="${barWidth}" height="${Math.max(2, aH)}" fill="#facc15" opacity="0.85" rx="1" />`;
+                    
+                    // Variação impressa diretamente em cima/dentro das colunas
+                    svg += `<text x="${xCenter}" y="${Math.min(yH, yA) - 4}" fill="#ffffff" font-size="8" font-weight="bold" text-anchor="middle">${Math.round(c.home)}% x ${Math.round(c.away)}%</text>`;
                 });
             }
 
             minutes.forEach((m, idx) => {
                 let x = (idx / (minutes.length > 1 ? minutes.length - 1 : 1)) * chartWidth + 20;
                 if (minutes.length === 1) x = width / 2;
-                svg += `<text x="${x}" y="86" fill="#94a3b8" font-size="9" text-anchor="middle">${m}'</text>`;
+                svg += `<text x="${x}" y="93" fill="#94a3b8" font-size="9" text-anchor="middle">${m}'</text>`;
             });
 
             svg += `</svg>`;
@@ -1327,12 +1333,19 @@ dashboard_html = """
                 let hPct = totalPress === 0 ? 50 : Math.round((hScorePress / totalPress) * 100);
                 let aPct = 100 - hPct;
 
+                // Cálculo cumulativo exclusivo para o Gráfico (para não zerar/cair no intervalo)
+                let hTotP = (parseNum(hStats.shotsOnTarget || 0) * 3.0) + (parseNum(hStats.totalShots || 0) * 1.0) + (parseNum(hStats.wonCorners || 0) * 1.5) + (parseNum(hStats.possessionPct || 50) * 0.2) + (aSaves * 1.5);
+                let aTotP = (parseNum(aStats.shotsOnTarget || 0) * 3.0) + (parseNum(aStats.totalShots || 0) * 1.0) + (parseNum(aStats.wonCorners || 0) * 1.5) + (parseNum(aStats.possessionPct || 50) * 0.2) + (hSaves * 1.5);
+                let totChart = hTotP + aTotP;
+                let chartHPct = totChart === 0 ? 50 : Math.round((hTotP / totChart) * 100);
+                let chartAPct = 100 - chartHPct;
+
                 let parsedClock = parseInt(displayClock);
                 if (!matchHistory[eventId]) matchHistory[eventId] = {};
                 if (!isNaN(parsedClock)) {
-                    matchHistory[eventId][parsedClock] = { home: hPct, away: aPct };
+                    matchHistory[eventId][parsedClock] = { home: chartHPct, away: chartAPct };
                 } else if (Object.keys(matchHistory[eventId]).length === 0) {
-                    matchHistory[eventId][10] = { home: hPct, away: aPct };
+                    matchHistory[eventId][10] = { home: chartHPct, away: chartAPct };
                 }
 
                 let getBarColor = (pct) => pct > 65 ? "#22c55e" : (pct > 51 ? "#f97316" : (pct >= 35 ? "#ffffff" : "#ef4444"));
@@ -1499,6 +1512,7 @@ dashboard_html = """
             mainContainer.innerHTML = html;
         }
 
+        document.getElementById('viewSelect').value = 'matches';
         document.getElementById('viewSelect').addEventListener('change', fetchAllData);
         document.getElementById('leagueSelect').addEventListener('change', () => {
             currentLoadedStandingsKey = "";
