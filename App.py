@@ -687,7 +687,6 @@ dashboard_html = """
                     
                     svg += `<circle cx="${x}" cy="${yH}" r="3" fill="#38bdf8" />`;
                     svg += `<circle cx="${x}" cy="${yA}" r="3" fill="#facc15" />`;
-                    // Variação em texto dentro do gráfico de linha
                     svg += `<text x="${x}" y="${Math.min(yH, yA) - 6}" fill="#fff" font-size="7" font-weight="bold" text-anchor="middle">${Math.round(c.home)}% x ${Math.round(c.away)}%</text>`;
                 });
             } else {
@@ -710,8 +709,6 @@ dashboard_html = """
 
                     svg += `<rect x="${xH}" y="${yH}" width="${barWidth}" height="${Math.max(2, hH)}" fill="#38bdf8" opacity="0.85" rx="1" />`;
                     svg += `<rect x="${xA}" y="${yA}" width="${barWidth}" height="${Math.max(2, aH)}" fill="#facc15" opacity="0.85" rx="1" />`;
-                    
-                    // Variação impressa diretamente em cima/dentro das colunas
                     svg += `<text x="${xCenter}" y="${Math.min(yH, yA) - 4}" fill="#ffffff" font-size="8" font-weight="bold" text-anchor="middle">${Math.round(c.home)}% x ${Math.round(c.away)}%</text>`;
                 });
             }
@@ -1333,12 +1330,9 @@ dashboard_html = """
                 let hPct = totalPress === 0 ? 50 : Math.round((hScorePress / totalPress) * 100);
                 let aPct = 100 - hPct;
 
-                // Cálculo cumulativo exclusivo para o Gráfico (para não zerar/cair no intervalo)
-                let hTotP = (parseNum(hStats.shotsOnTarget || 0) * 3.0) + (parseNum(hStats.totalShots || 0) * 1.0) + (parseNum(hStats.wonCorners || 0) * 1.5) + (parseNum(hStats.possessionPct || 50) * 0.2) + (aSaves * 1.5);
-                let aTotP = (parseNum(aStats.shotsOnTarget || 0) * 3.0) + (parseNum(aStats.totalShots || 0) * 1.0) + (parseNum(aStats.wonCorners || 0) * 1.5) + (parseNum(aStats.possessionPct || 50) * 0.2) + (hSaves * 1.5);
-                let totChart = hTotP + aTotP;
-                let chartHPct = totChart === 0 ? 50 : Math.round((hTotP / totChart) * 100);
-                let chartAPct = 100 - chartHPct;
+                // Sincronização rigorosa da métrica do gráfico com o termômetro atual (separando 1º e 2º tempo)
+                let chartHPct = hPct;
+                let chartAPct = aPct;
 
                 let parsedClock = parseInt(displayClock);
                 if (!matchHistory[eventId]) matchHistory[eventId] = {};
