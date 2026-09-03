@@ -411,7 +411,7 @@ dashboard_html = """
                     <option value="all_live">🟢 Todos os Jogos ao Vivo (Global)</option>
                     <option value="bra.1">🇧🇷 Brasileirão Série A</option>
                     <option value="bra.2">🇧🇷 Brasileirão Série B</option>
-                    <option value="bra.copa_brasil">🇧🇷 Copa do Brasil</option>
+                    <option value="bra.copa_do_brazil">🇧🇷 Copa do Brasil</option>
                     <option value="conmebol.libertadores">🌎 Copa Libertadores</option>
                     <option value="conmebol.sudamericana">🌎 Copa Sudamericana</option>
                     <option value="uefa.champions">🇪🇺 Champions League</option>
@@ -423,6 +423,13 @@ dashboard_html = """
                     <option value="fra.1">🇫🇷 Ligue 1</option>
                     <option value="por.1">🇵🇹 Primeira Liga</option>
                     <option value="ksa.1">🇸🇦 Saudi Pro League</option>
+                    <option value="qat.1">🇶🇦 Qatar Stars League</option>
+                    <option value="uae.1">🇦🇪 UAE Pro League</option>
+                    <option value="afc.champions">🌏 AFC Champions League</option>
+                    <option value="jpn.1">🇯🇵 J1 League (Japão)</option>
+                    <option value="kor.1">🇰🇷 K League 1 (Coreia do Sul)</option>
+                    <option value="chn.1">🇨🇳 Chinese Super League</option>
+                    <option value="aus.1">🇦🇺 A-League (Austrália)</option>
                     <option value="arg.1">🇦🇷 Liga Profesional</option>
                     <option value="mex.1">🇲🇽 Liga MX</option>
                     <option value="col.1">🇨🇴 Campeonato Colombiano</option>
@@ -447,29 +454,17 @@ dashboard_html = """
 
     <script>
         const LEAGUES = {
-            "bra.1": "Brasileirão Série A", 
-            "bra.2": "Brasileirão Série B", 
-            "bra.copa_brasil": "Copa do Brasil",
-            "bra.copa_do_brazil": "Copa do Brasil",
-            "conmebol.libertadores": "Copa Libertadores", 
-            "conmebol.sudamericana": "Copa Sudamericana",
-            "uefa.champions": "Champions League", 
-            "uefa.europa": "Europa League",
-            "eng.1": "Premier League", 
-            "esp.1": "La Liga", 
-            "ita.1": "Serie A (Itália)", 
-            "ger.1": "Bundesliga",
-            "fra.1": "Ligue 1", 
-            "por.1": "Primeira Liga", 
-            "ksa.1": "Saudi Pro League",
-            "arg.1": "Liga Profesional", 
-            "mex.1": "Liga MX", 
-            "col.1": "Campeonato Colombiano",
-            "ecu.1": "Campeonato do Equador", 
-            "chi.1": "Liga Chilena", 
-            "ned.1": "Eredivisie",
-            "usa.1": "MLS", 
-            "fifa.friendly": "Jogos Internacionais"
+            "bra.1": "Brasileirão Série A", "bra.2": "Brasileirão Série B", "bra.copa_do_brazil": "Copa do Brasil",
+            "conmebol.libertadores": "Copa Libertadores", "conmebol.sudamericana": "Copa Sudamericana",
+            "uefa.champions": "Champions League", "uefa.europa": "Europa League",
+            "eng.1": "Premier League", "esp.1": "La Liga", "ita.1": "Serie A (Itália)", "ger.1": "Bundesliga",
+            "fra.1": "Ligue 1", "por.1": "Primeira Liga", "ksa.1": "Saudi Pro League",
+            "qat.1": "Qatar Stars League", "uae.1": "UAE Pro League",
+            "afc.champions": "AFC Champions League", "jpn.1": "J1 League (Japão)", "kor.1": "K League 1 (Coreia do Sul)",
+            "chn.1": "Chinese Super League", "aus.1": "A-League (Austrália)",
+            "arg.1": "Liga Profesional", "mex.1": "Liga MX", "col.1": "Campeonato Colombiano",
+            "ecu.1": "Campeonato do Equador", "chi.1": "Liga Chilena", "ned.1": "Eredivisie",
+            "usa.1": "MLS", "fifa.friendly": "Jogos Internacionais"
         };
 
         let matchScores = {};
@@ -478,8 +473,8 @@ dashboard_html = """
         let summariesCache = {};
         let standingsCache = {};
         let openStates = {};
+        let openChartStates = {};
         let matchHistory = {}; 
-        let matchPressureState = {}; // Guarda estado persistente da barra de pressão por partida
         let chartTypes = {};   
         let onlyToday = false; 
         let goalAlertTimer = null;
@@ -545,13 +540,23 @@ dashboard_html = """
             } catch(e) { return "Horário a confirmar"; }
         }
 
-        function getDateString(offsetDays) {
+        function getBrasiliaDate(offsetDays = 0) {
             let d = new Date();
             d.setDate(d.getDate() + offsetDays);
-            let year = d.getFullYear();
-            let month = String(d.getMonth() + 1).padStart(2, '0');
-            let day = String(d.getDate()).padStart(2, '0');
-            return `${year}${month}${day}`;
+            let formatter = new Intl.DateTimeFormat('en-CA', {
+                timeZone: 'America/Sao_Paulo',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+            });
+            let parts = formatter.formatToParts(d);
+            let year = parts.find(p => p.type === 'year').value;
+            let month = parts.find(p => p.type === 'month').value;
+            let day = parts.find(p => p.type === 'day').value;
+            return {
+                ymd: `${year}-${month}-${day}`,
+                compact: `${year}${month}${day}`
+            };
         }
 
         async function asyncizedFetchSummary(slug, eventId, isLive = false) {
@@ -570,24 +575,13 @@ dashboard_html = """
 
         async function updateGlobalTicker() {
             let tickerMatches = [];
-            let yestStr = getDateString(-1);
-            let todayStr = getDateString(0);
-            let uniqueSlugs = [...new Set(Object.keys(LEAGUES))];
 
-            for (let lSlug of uniqueSlugs) {
+            for (let lSlug of Object.keys(LEAGUES)) {
                 try {
-                    let [resYest, resToday] = await Promise.all([
-                        fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard?dates=${yestStr}`),
-                        fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard?dates=${todayStr}`)
-                    ]);
-
-                    let dataYest = resYest.ok ? await resYest.json() : { events: [] };
-                    let dataToday = resToday.ok ? await resToday.json() : { events: [] };
-
-                    let eventMap = {};
-                    (dataYest.events || []).forEach(ev => eventMap[ev.id] = ev);
-                    (dataToday.events || []).forEach(ev => eventMap[ev.id] = ev);
-                    let events = Object.values(eventMap);
+                    let res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard`);
+                    if (!res.ok) continue;
+                    let data = await res.json();
+                    let events = data.events || [];
 
                     for (let ev of events) {
                         let comp = ev.competitions[0];
@@ -647,8 +641,7 @@ dashboard_html = """
         function renderChartSvg(eventId, hTeamName, aTeamName, currentHPct, currentAPct) {
             if (!matchHistory[eventId] || Object.keys(matchHistory[eventId]).length === 0) {
                 matchHistory[eventId] = {
-                    15: { home: Math.max(10, Math.round(currentHPct * 0.85)), away: Math.max(10, Math.round(currentAPct * 1.15)) },
-                    45: { home: currentHPct, away: currentAPct }
+                    10: { home: currentHPct, away: currentAPct }
                 };
             }
 
@@ -657,23 +650,25 @@ dashboard_html = """
             let cType = chartTypes[eventId] || 'line';
 
             let width = 500;
-            let height = 95;
+            let height = 105;
 
             let svg = `<svg viewBox="0 0 ${width} ${height}" style="width:100%; height:${height}px; overflow:visible;">`;
             
-            svg += `<line x1="0" y1="20" x2="${width}" y2="20" stroke="#1e293b" stroke-width="1" />`;
-            svg += `<line x1="0" y1="45" x2="${width}" y2="45" stroke="#1e293b" stroke-width="1" stroke-dasharray="2,2"/>`;
-            svg += `<line x1="0" y1="70" x2="${width}" y2="70" stroke="#1e293b" stroke-width="1" />`;
+            svg += `<line x1="20" y1="15" x2="${width - 20}" y2="15" stroke="#1e293b" stroke-width="1" />`;
+            svg += `<line x1="20" y1="42" x2="${width - 20}" y2="42" stroke="#1e293b" stroke-width="1" stroke-dasharray="2,2"/>`;
+            svg += `<line x1="20" y1="70" x2="${width - 20}" y2="70" stroke="#1e293b" stroke-width="1" />`;
 
             let homePoints = [];
             let awayPoints = [];
+            let chartWidth = width - 40;
+            let chartHeight = 55;
 
             minutes.forEach((m, idx) => {
                 let hVal = history[m].home;
                 let aVal = history[m].away;
-                let x = (idx / (minutes.length > 1 ? minutes.length - 1 : 1)) * (width - 40) + 20;
-                let yH = height - (hVal / 100) * (height - 25) - 10;
-                let yA = height - (aVal / 100) * (height - 25) - 10;
+                let x = (idx / (minutes.length > 1 ? minutes.length - 1 : 1)) * chartWidth + 20;
+                let yH = 70 - (hVal / 100) * chartHeight;
+                let yA = 70 - (aVal / 100) * chartHeight;
                 homePoints.push(`${x},${yH}`);
                 awayPoints.push(`${x},${yA}`);
             });
@@ -686,22 +681,40 @@ dashboard_html = """
                 minutes.forEach((m, idx) => {
                     let hVal = history[m].home;
                     let aVal = history[m].away;
-                    let x = (idx / (minutes.length > 1 ? minutes.length - 1 : 1)) * (width - 40) + 20;
-                    let yH = height - (hVal / 100) * (height - 25) - 10;
-                    let yA = height - (aVal / 100) * (height - 25) - 10;
-                    svg += `<circle cx="${x}" cy="${yH}" r="2.5" fill="#38bdf8" />`;
-                    svg += `<circle cx="${x}" cy="${yA}" r="2.5" fill="#facc15" />`;
+                    let x = (idx / (minutes.length > 1 ? minutes.length - 1 : 1)) * chartWidth + 20;
+                    let yH = 70 - (hVal / 100) * chartHeight;
+                    let yA = 70 - (aVal / 100) * chartHeight;
+                    svg += `<circle cx="${x}" cy="${yH}" r="3" fill="#38bdf8" />`;
+                    svg += `<circle cx="${x}" cy="${yA}" r="3" fill="#facc15" />`;
                 });
             } else {
-                let candleWidth = Math.max(3, Math.min(10, (width / minutes.length) - 4));
+                let groupWidth = chartWidth / Math.max(1, minutes.length);
+                let barWidth = Math.max(3, groupWidth * 0.38);
+
                 minutes.forEach((m, idx) => {
                     let c = history[m];
-                    let x = (idx / (minutes.length > 1 ? minutes.length - 1 : 1)) * (width - 40) + 20;
-                    let yH = height - (c.home / 100) * (height - 25) - 10;
-                    let yA = height - (c.away / 100) * (height - 25) - 10;
-                    svg += `<rect x="${x - candleWidth/2}" y="${Math.min(yH, yA)}" width="${candleWidth}" height="${Math.max(2, Math.abs(yH - yA))}" fill="#38bdf8" opacity="0.8" rx="1" />`;
+                    let xCenter = (idx / (minutes.length > 1 ? minutes.length - 1 : 1)) * chartWidth + 20;
+                    if (minutes.length === 1) xCenter = width / 2;
+
+                    let xH = xCenter - barWidth - 1;
+                    let xA = xCenter + 1;
+
+                    let hH = (c.home / 100) * chartHeight;
+                    let aH = (c.away / 100) * chartHeight;
+
+                    let yH = 70 - hH;
+                    let yA = 70 - aH;
+
+                    svg += `<rect x="${xH}" y="${yH}" width="${barWidth}" height="${Math.max(2, hH)}" fill="#38bdf8" opacity="0.85" rx="1" />`;
+                    svg += `<rect x="${xA}" y="${yA}" width="${barWidth}" height="${Math.max(2, aH)}" fill="#facc15" opacity="0.85" rx="1" />`;
                 });
             }
+
+            minutes.forEach((m, idx) => {
+                let x = (idx / (minutes.length > 1 ? minutes.length - 1 : 1)) * chartWidth + 20;
+                if (minutes.length === 1) x = width / 2;
+                svg += `<text x="${x}" y="86" fill="#94a3b8" font-size="9" text-anchor="middle">${m}'</text>`;
+            });
 
             svg += `</svg>`;
             return svg;
@@ -722,7 +735,7 @@ dashboard_html = """
 
             mainContainer.innerHTML = "<div style='text-align:center; color:#94a3b8; padding:20px;'>Carregando classificação e chaveamentos...</div>";
 
-            let isCup = lSlug.includes('copa_brasil') || lSlug.includes('copa_do_brazil') || lSlug.includes('libertadores') || lSlug.includes('sudamericana') || lSlug.includes('champions') || lSlug.includes('europa') || lSlug.includes('friendly');
+            let isCup = lSlug.includes('copa_do_brazil') || lSlug.includes('libertadores') || lSlug.includes('sudamericana') || lSlug.includes('champions') || lSlug.includes('europa') || lSlug.includes('friendly');
 
             if (isCup) {
                 try {
@@ -776,12 +789,15 @@ dashboard_html = """
                                 let ev = item.ev;
                                 let comp = item.comp;
                                 let hTeam = "Casa", aTeam = "Fora", hScore = "0", aScore = "0";
+                                let hId = "", aId = "";
                                 for (let c of comp.competitors) {
                                     if (c.homeAway === 'home') {
                                         hTeam = c.team.displayName || c.team.shortDisplayName;
+                                        hId = c.team.id;
                                         hScore = c.score;
                                     } else {
                                         aTeam = c.team.displayName || c.team.shortDisplayName;
+                                        aId = c.team.id;
                                         aScore = c.score;
                                     }
                                 }
@@ -942,35 +958,15 @@ dashboard_html = """
             let searchQuery = document.getElementById('searchInput').value.toLowerCase().trim();
             
             let matchesToDisplay = [];
-            let leaguesToFetch = [];
-            if (onlyToday) {
-                leaguesToFetch = [...new Set(Object.keys(LEAGUES))];
-            } else {
-                leaguesToFetch = selectedLeague === 'all_live' ? [...new Set(Object.keys(LEAGUES))] : [selectedLeague];
-            }
-
-            let yestStr = getDateString(-1);
-            let todayStr = getDateString(0);
-            let tomorrowStr = getDateString(1);
-            let todayYMD = new Date().toLocaleDateString('en-CA'); 
+            let leaguesToFetch = selectedLeague === 'all_live' ? Object.keys(LEAGUES) : [selectedLeague];
+            let todayBrasilia = getBrasiliaDate(0); 
 
             for (let lSlug of leaguesToFetch) {
                 try {
-                    let [resYest, resToday, resTomorrow] = await Promise.all([
-                        fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard?dates=${yestStr}`),
-                        fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard?dates=${todayStr}`),
-                        fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard?dates=${tomorrowStr}`)
-                    ]);
-
-                    let dataYest = resYest.ok ? await resYest.json() : { events: [] };
-                    let dataToday = resToday.ok ? await resToday.json() : { events: [] };
-                    let dataTomorrow = resTomorrow.ok ? await resTomorrow.json() : { events: [] };
-
-                    let eventMap = {};
-                    (dataYest.events || []).forEach(ev => eventMap[ev.id] = ev);
-                    (dataToday.events || []).forEach(ev => eventMap[ev.id] = ev);
-                    (dataTomorrow.events || []).forEach(ev => eventMap[ev.id] = ev);
-                    let events = Object.values(eventMap);
+                    let res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lSlug}/scoreboard`);
+                    if (!res.ok) continue;
+                    let data = await res.json();
+                    let events = data.events || [];
 
                     for (let ev of events) {
                         let comp = ev.competitions[0];
@@ -978,8 +974,20 @@ dashboard_html = """
                         let leagueName = LEAGUES[lSlug] || lSlug;
 
                         if (onlyToday) {
-                            let evDateYMD = ev.date ? ev.date.split('T')[0] : '';
-                            if (evDateYMD !== todayYMD) continue;
+                            let evDate = new Date(ev.date);
+                            let evBrasiliaFormatter = new Intl.DateTimeFormat('en-CA', {
+                                timeZone: 'America/Sao_Paulo',
+                                year: 'numeric',
+                                month: '2-digit',
+                                day: '2-digit'
+                            });
+                            let evParts = evBrasiliaFormatter.formatToParts(evDate);
+                            let evY = evParts.find(p => p.type === 'year').value;
+                            let evM = evParts.find(p => p.type === 'month').value;
+                            let evD = evParts.find(p => p.type === 'day').value;
+                            let evDateYMD = `${evY}-${evM}-${evD}`;
+
+                            if (evDateYMD !== todayBrasilia.ymd) continue;
                             matchesToDisplay.push({ leagueName, lSlug, event: ev });
                         } else if (searchQuery) {
                             if (ev.name.toLowerCase().includes(searchQuery)) {
@@ -995,10 +1003,6 @@ dashboard_html = """
                     }
                 } catch(e) {}
             }
-
-            let uniqueMatchMap = {};
-            matchesToDisplay.forEach(m => uniqueMatchMap[m.event.id] = m);
-            matchesToDisplay = Object.values(uniqueMatchMap);
 
             matchesToDisplay.sort((a, b) => new Date(a.event.date) - new Date(b.event.date));
 
@@ -1087,6 +1091,33 @@ dashboard_html = """
                     });
                 }
 
+                if (hStarters.length === 0 && summary.rosters) {
+                    summary.rosters.forEach(r => {
+                        if (r.team && r.team.id === homeTeamId) {
+                            let arr = r.roster || r.athletes || [];
+                            arr.slice(0, 11).forEach(p => {
+                                let pName = p.athlete?.displayName || p.name || "Jogador";
+                                let pNum = p.jersey || p.shirtNumber || "";
+                                let pPos = p.position?.abbreviation || "";
+                                hStarters.push(`${pNum ? '#' + pNum + ' ' : ''}${pName} ${pPos ? '(' + pPos + ')' : ''}`);
+                            });
+                        }
+                    });
+                }
+                if (aStarters.length === 0 && summary.rosters) {
+                    summary.rosters.forEach(r => {
+                        if (r.team && r.team.id === awayTeamId) {
+                            let arr = r.roster || r.athletes || [];
+                            arr.slice(0, 11).forEach(p => {
+                                let pName = p.athlete?.displayName || p.name || "Jogador";
+                                let pNum = p.jersey || p.shirtNumber || "";
+                                let pPos = p.position?.abbreviation || "";
+                                aStarters.push(`${pNum ? '#' + pNum + ' ' : ''}${pName} ${pPos ? '(' + pPos + ')' : ''}`);
+                            });
+                        }
+                    });
+                }
+
                 let hCurrentPlayers = [...hStarters];
                 let aCurrentPlayers = [...aStarters];
 
@@ -1096,17 +1127,17 @@ dashboard_html = """
                     let isHome = d.team && d.team.id === homeTeamId;
                     let isAway = d.team && d.team.id === awayTeamId;
 
-                    if (text.includes("yellow card") || text.includes("cartão amarelo") || typeName.includes("yellow")) {
+                    if (text.includes("yellow card") || text.includes("cartão amarelo") || typeName.includes("yellow") || typeName.includes("yellowcard")) {
                         if (isHome) hYellowCount++;
                         if (isAway) aYellowCount++;
                     }
-                    if (text.includes("red card") || text.includes("cartão vermelho") || typeName.includes("red")) {
+                    if (text.includes("red card") || text.includes("cartão vermelho") || typeName.includes("red") || typeName.includes("redcard")) {
                         if (isHome) hRedCount++;
                         if (isAway) aRedCount++;
 
                         let player = "Jogador";
                         if (d.athlete && d.athlete.displayName) player = d.athlete.displayName;
-                        else if (d.athletesInvolved && d.athletesInvolved[0]) player = d.athletesInvolved[0].displayName;
+                        else if (d.athletesInvolved && d.athletesInvolved[0] && d.athletesInvolved[0].displayName) player = d.athletesInvolved[0].displayName;
 
                         let clockVal = (d.clock && d.clock.displayValue) ? d.clock.displayValue : "";
                         let redStr = `🟥 <b>${player}</b> ${clockVal ? '(' + clockVal + "')" : ''}`;
@@ -1117,17 +1148,29 @@ dashboard_html = """
                         }
                     }
 
-                    let isSub = text.includes("substitution") || text.includes("substituição") || typeName.includes("sub");
+                    let isSub = text.includes("substitution") || text.includes("substituição") || typeName.includes("sub") || text.includes("sub");
                     if (isSub) {
                         let playerIn = "";
                         let playerOut = "";
 
                         if (d.athletesInvolved && d.athletesInvolved.length >= 2) {
-                            playerIn = d.athletesInvolved[0].displayName || "";
-                            playerOut = d.athletesInvolved[1].displayName || "";
+                            playerIn = d.athletesInvolved[0].displayName || d.athletesInvolved[0].name || "";
+                            playerOut = d.athletesInvolved[1].displayName || d.athletesInvolved[1].name || "";
+                        } else if (d.participants && d.participants.length >= 2) {
+                            playerIn = d.participants[0].athlete?.displayName || d.participants[0].name || "";
+                            playerOut = d.participants[1].athlete?.displayName || d.participants[1].name || "";
+                        } else if (d.text) {
+                            let parts = d.text.split('/');
+                            if (parts.length >= 2) {
+                                playerIn = parts[0].replace(/[^a-zA-Zá-úÁ-Ú\s]/g, '').trim();
+                                playerOut = parts[1].replace(/[^a-zA-Zá-úÁ-Ú\s]/g, '').trim();
+                            } else {
+                                playerIn = d.athlete?.displayName || "Substituto";
+                            }
                         } else if (d.athlete && d.athlete.displayName) {
                             playerIn = d.athlete.displayName;
                         }
+
                         if (!playerIn) playerIn = "Entrou";
                         if (!playerOut) playerOut = "Saiu";
 
@@ -1136,21 +1179,34 @@ dashboard_html = """
                         
                         if (isHome) {
                             if (!substitutionsListHome.includes(subStr)) substitutionsListHome.push(subStr);
+                            let idx = hCurrentPlayers.findIndex(p => p.toLowerCase().includes(playerOut.toLowerCase()));
+                            if (idx !== -1) {
+                                hCurrentPlayers[idx] = `<span style="color:#22c55e;">🟢 ${playerIn} (Entrou)</span> <span style="color:#ef4444; font-size:9px;">[Saiu ${playerOut}]</span>`;
+                            } else {
+                                hCurrentPlayers.push(`<span style="color:#22c55e;">🟢 ${playerIn} (Entrou)</span> <span style="color:#ef4444; font-size:9px;">[Saiu ${playerOut}]</span>`);
+                            }
                         }
                         if (isAway) {
                             if (!substitutionsListAway.includes(subStr)) substitutionsListAway.push(subStr);
+                            let idx = aCurrentPlayers.findIndex(p => p.toLowerCase().includes(playerOut.toLowerCase()));
+                            if (idx !== -1) {
+                                aCurrentPlayers[idx] = `<span style="color:#22c55e;">🟢 ${playerIn} (Entrou)</span> <span style="color:#ef4444; font-size:9px;">[Saiu ${playerOut}]</span>`;
+                            } else {
+                                aCurrentPlayers.push(`<span style="color:#22c55e;">🟢 ${playerIn} (Entrou)</span> <span style="color:#ef4444; font-size:9px;">[Saiu ${playerOut}]</span>`);
+                            }
                         }
                     }
                     
-                    let isGoal = text.includes("goal") || text.includes("gol") || text.includes("penalty") || text.includes("pênalti") || d.scoringPlay === true;
+                    let isGoal = text.includes("goal") || text.includes("gol") || text.includes("penalty") || text.includes("pênalti") || text.includes("penal") || typeName.includes("goal") || typeName.includes("penalty") || d.scoringPlay === true;
+                    
                     if (isGoal) {
                         let scorer = "Gol";
                         if (d.athlete && d.athlete.displayName) scorer = d.athlete.displayName;
-                        else if (d.athletesInvolved && d.athletesInvolved[0]) scorer = d.athletesInvolved[0].displayName;
+                        else if (d.athletesInvolved && d.athletesInvolved[0] && d.athletesInvolved[0].displayName) scorer = d.athletesInvolved[0].displayName;
                         
                         let clockVal = (d.clock && d.clock.displayValue) ? d.clock.displayValue : "";
                         let isOwn = text.includes("own goal") || text.includes("contra");
-                        let isPenalty = text.includes("penalty") || text.includes("pênalti");
+                        let isPenalty = text.includes("penalty") || text.includes("pênalti") || text.includes("penal") || typeName.includes("penalty");
                         
                         let goalStr = `⚽ ${isPenalty ? '(Pên) ' : ''}<b>${scorer}${isOwn ? ' (Contra)' : ''}</b> ${clockVal ? '(' + clockVal + "')" : ''}`;
                         if (isHome) {
@@ -1172,18 +1228,25 @@ dashboard_html = """
                     if (matchStates[eventId] === 'pre' && (state === 'in' || competition.status.type.name === 'STATUS_HALFTIME')) {
                         showBanner(`🟢 Iniciou: <b>${homeTeam} ${homeScore} x ${awayScore} ${awayTeam}</b><br><span style="font-size:11px; color:#94a3b8;">${lName}</span>`, false);
                     }
+
                     if (matchStates[eventId] !== 'post' && state === 'post') {
                         showBanner(`🏁 Finalizado: <b>${homeTeam} ${homeScore} x ${awayScore} ${awayTeam}</b><br><span style="font-size:11px; color:#94a3b8;">${lName}</span>`, false);
                     }
+
                     if (matchScores[eventId] && matchScores[eventId] !== scoreKey) {
                         let [prevH, prevA] = matchScores[eventId].split('-').map(Number);
                         let curH = parseInt(homeScore), curA = parseInt(awayScore);
                         
                         if (curH > prevH || curA > prevA) {
                             let scoringTeamName = curH > prevH ? homeTeam : awayTeam;
-                            showBanner(`⚽ GOL DO <b>${scoringTeamName.toUpperCase()}</b><br><span style="font-size:13px; color:#facc15;">${homeTeam} ${homeScore} x ${awayScore} ${awayTeam}</span><br><span style="font-size:11px; color:#94a3b8;">${lName}</span>`, true);
+                            let scorerName = curH > prevH ? 
+                                (hGoalsList.length > 0 ? hGoalsList[hGoalsList.length - 1].replace(/<\/?[^>]+(>|$)/g, "").replace(/^⚽\s*(\(Pên\)\s*)?/, "") : "Desconhecido") :
+                                (aGoalsList.length > 0 ? aGoalsList[aGoalsList.length - 1].replace(/<\/?[^>]+(>|$)/g, "").replace(/^⚽\s*(\(Pên\)\s*)?/, "") : "Desconhecido");
+
+                            showBanner(`⚽ GOL DO <b>${scoringTeamName.toUpperCase()}</b><br>Autor: <b>${scorerName}</b><br><span style="font-size:13px; color:#facc15;">${homeTeam} ${homeScore} x ${awayScore} ${awayTeam}</span><br><span style="font-size:11px; color:#94a3b8;">${lName}</span>`, true);
                         }
                     }
+
                     matchScores[eventId] = scoreKey;
                     matchStates[eventId] = state;
                 }
@@ -1210,34 +1273,37 @@ dashboard_html = """
                 let hSaves = parseNum(hStats.saves || hStats.defesas || 0);
                 let aSaves = parseNum(aStats.saves || aStats.defesas || 0);
 
-                // ==========================================
-                // LÓGICA DA BARRA DE PRESSÃO (INDEPENDENTE E PERSISTENTE)
-                // Só reinicia ou zera quando muda para o 2º tempo
-                // ==========================================
-                if (!matchPressureState[eventId]) {
-                    matchPressureState[eventId] = { lastPeriod: period, baseSet: false };
-                }
-
-                let isSecondHalf = (period >= 2 || statusName.includes('SECOND_HALF') || rawDetail.toLowerCase().includes('2º tempo'));
-
                 let hScorePress = 0;
                 let aScorePress = 0;
+                let isSecondHalf = (period >= 2 || statusName.includes('SECOND_HALF') || rawDetail.toLowerCase().includes('2º tempo') || rawDetail.toLowerCase().includes('second half'));
 
                 if (isSecondHalf) {
-                    // Se acabou de virar para o 2º tempo, reseta a base de pressão separada do 1º tempo
-                    if (matchPressureState[eventId].lastPeriod < 2) {
-                        matchPressureState[eventId].baseSet = true;
-                    }
                     hScorePress = 10;
                     aScorePress = 10;
 
                     for (let d of allDetails) {
                         let pNum = d.period?.number || d.clock?.period || 1;
-                        if (pNum >= 2) {
+                        let clockVal = parseNum(d.clock?.displayValue || "0");
+                        
+                        if (pNum >= 2 || (pNum === 1 && clockVal > 45)) {
                             let text = (d.type && d.type.text) ? d.type.text.toLowerCase() : "";
+                            let typeName = (d.type && d.type.name) ? d.type.name.toLowerCase() : "";
                             let isHome = d.team && d.team.id === homeTeamId;
                             let isAway = d.team && d.team.id === awayTeamId;
-                            let weight = text.includes("goal") ? 6 : (text.includes("red") ? 3 : (text.includes("yellow") ? 1.5 : 1));
+
+                            let weight = 1;
+                            if (text.includes("goal") || text.includes("gol") || text.includes("penalty") || text.includes("pênalti")) {
+                                weight = 6;
+                            } else if (text.includes("yellow") || text.includes("amarelo")) {
+                                weight = 1.5;
+                            } else if (text.includes("red") || text.includes("vermelho")) {
+                                weight = 3;
+                            } else if (text.includes("shot") || text.includes("chute")) {
+                                weight = 2;
+                            } else if (text.includes("corner") || text.includes("escanteio")) {
+                                weight = 1.5;
+                            }
+
                             if (isHome) hScorePress += weight;
                             if (isAway) aScorePress += weight;
                         }
@@ -1256,23 +1322,18 @@ dashboard_html = """
                     hScorePress = (hShotsOn * 3.0) + (hShotsTot * 1.0) + (hCorners * 1.5) + (hPoss * 0.2) + (aSaves * 1.5);
                     aScorePress = (aShotsOn * 3.0) + (aShotsTot * 1.0) + (aCorners * 1.5) + (aPoss * 0.2) + (hSaves * 1.5);
                 }
-                matchPressureState[eventId].lastPeriod = period;
 
                 let totalPress = hScorePress + aScorePress;
                 let hPct = totalPress === 0 ? 50 : Math.round((hScorePress / totalPress) * 100);
                 let aPct = 100 - hPct;
 
-                // ==========================================
-                // GRAVAÇÃO DA POSIÇÃO DO GRÁFICO A CADA MINUTO (SEM VOLTAR AO ZERO)
-                // ==========================================
-                let currentMin = parseInt(displayClock);
-                if (isNaN(currentMin)) {
-                    currentMin = period === 1 ? 15 : (period === 2 ? 60 : 45);
-                }
-
+                let parsedClock = parseInt(displayClock);
                 if (!matchHistory[eventId]) matchHistory[eventId] = {};
-                // Salva ou atualiza a posição do minuto atual no histórico sem zerar os anteriores
-                matchHistory[eventId][currentMin] = { home: hPct, away: aPct };
+                if (!isNaN(parsedClock)) {
+                    matchHistory[eventId][parsedClock] = { home: hPct, away: aPct };
+                } else if (Object.keys(matchHistory[eventId]).length === 0) {
+                    matchHistory[eventId][10] = { home: hPct, away: aPct };
+                }
 
                 let getBarColor = (pct) => pct > 65 ? "#22c55e" : (pct > 51 ? "#f97316" : (pct >= 35 ? "#ffffff" : "#ef4444"));
                 let getBarLabel = (pct) => pct > 65 ? "Pressão Alta" : (pct > 51 ? "Pressão Moderada" : (pct >= 35 ? "Neutro" : "Defensiva / Baixa"));
@@ -1320,6 +1381,7 @@ dashboard_html = """
                 }
 
                 let isOpen = openStates[eventId] ? 'open' : '';
+                let isOpenChart = openChartStates[eventId] ? 'open' : '';
                 let possH = hStats.possessionPct || "0%"; if(!possH.includes("%") && possH !== "0") possH += "%";
                 let possA = aStats.possessionPct || "0%"; if(!possA.includes("%") && possA !== "0") possA += "%";
 
@@ -1359,19 +1421,22 @@ dashboard_html = """
                             </div>
                         </div>
 
-                        <div class="chart-container">
-                            <div class="chart-controls">
-                                <span>📈 Força/Pressão Comparativa (${homeTeam} <span style="color:#38bdf8;">■</span> vs ${awayTeam} <span style="color:#facc15;">■</span>)</span>
-                                <div>
-                                    <label>Estilo:</label>
-                                    <select onchange="chartTypes['${eventId}'] = this.value; fetchAllData();">
-                                        <option value="line" ${activeChartType==='line'?'selected':''}>Linha</option>
-                                        <option value="candle" ${activeChartType==='candle'?'selected':''}>Candlestick</option>
-                                    </select>
+                        <details ${isOpenChart} ontoggle="openChartStates['${eventId}'] = this.open;">
+                            <summary>📈 Gráfico de Força e Pressão Comparativa (${homeTeam} vs ${awayTeam})</summary>
+                            <div class="chart-container">
+                                <div class="chart-controls">
+                                    <span>Evolução da Pressão (${homeTeam} <span style="color:#38bdf8;">■</span> vs ${awayTeam} <span style="color:#facc15;">■</span>)</span>
+                                    <div>
+                                        <label>Estilo:</label>
+                                        <select onchange="chartTypes['${eventId}'] = this.value; fetchAllData();">
+                                            <option value="line" ${activeChartType==='line'?'selected':''}>Linha</option>
+                                            <option value="candle" ${activeChartType==='candle'?'selected':''}>Colunas</option>
+                                        </select>
+                                    </div>
                                 </div>
+                                ${chartSvgContent}
                             </div>
-                            ${chartSvgContent}
-                        </div>
+                        </details>
 
                         <details data-event-id="${eventId}" ${isOpen} ontoggle="openStates['${eventId}'] = this.open;">
                             <summary>📊 Estatísticas & Jogadores em Campo (${homeTeam} vs ${awayTeam})</summary>
