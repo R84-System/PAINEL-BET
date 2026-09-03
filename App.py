@@ -474,13 +474,27 @@ dashboard_html = """
         let standingsCache = {};
         let openStates = {};
         let openChartStates = {};
-        let matchHistory = {}; 
         let chartTypes = {};   
         let onlyToday = false; 
         let goalAlertTimer = null;
         let pollInterval = null;
         let tickerInterval = null;
         let currentLoadedStandingsKey = "";
+
+        // Carrega o histórico salvo no navegador (persistente após F5)
+        let matchHistory = {};
+        try {
+            let savedHistory = localStorage.getItem('matchHistory_pro_soccer');
+            if (savedHistory) {
+                matchHistory = JSON.parse(savedHistory);
+            }
+        } catch(e) {}
+
+        function saveMatchHistory() {
+            try {
+                localStorage.setItem('matchHistory_pro_soccer', JSON.stringify(matchHistory));
+            } catch(e) {}
+        }
 
         function toggleTodayFilter() {
             onlyToday = !onlyToday;
@@ -643,6 +657,7 @@ dashboard_html = """
                 matchHistory[eventId] = {
                     10: { home: currentHPct, away: currentAPct }
                 };
+                saveMatchHistory();
             }
 
             let history = matchHistory[eventId];
@@ -1330,7 +1345,6 @@ dashboard_html = """
                 let hPct = totalPress === 0 ? 50 : Math.round((hScorePress / totalPress) * 100);
                 let aPct = 100 - hPct;
 
-                // Sincronização rigorosa da métrica do gráfico com o termômetro atual (separando 1º e 2º tempo)
                 let chartHPct = hPct;
                 let chartAPct = aPct;
 
@@ -1338,8 +1352,10 @@ dashboard_html = """
                 if (!matchHistory[eventId]) matchHistory[eventId] = {};
                 if (!isNaN(parsedClock)) {
                     matchHistory[eventId][parsedClock] = { home: chartHPct, away: chartAPct };
+                    saveMatchHistory();
                 } else if (Object.keys(matchHistory[eventId]).length === 0) {
                     matchHistory[eventId][10] = { home: chartHPct, away: chartAPct };
+                    saveMatchHistory();
                 }
 
                 let getBarColor = (pct) => pct > 65 ? "#22c55e" : (pct > 51 ? "#f97316" : (pct >= 35 ? "#ffffff" : "#ef4444"));
@@ -1517,6 +1533,7 @@ dashboard_html = """
         fetchAllData();
         updateGlobalTicker();
 
+        // Intervalo ajustado para 4 segundos se desejado (pode alterar conforme preferir)
         pollInterval = setInterval(fetchAllData, 4000);
         tickerInterval = setInterval(updateGlobalTicker, 45000);
     </script>
